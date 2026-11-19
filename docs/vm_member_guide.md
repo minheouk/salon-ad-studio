@@ -83,6 +83,13 @@ cd salon-ad-studio
 
 VS Code 터미널에서 `git push`를 하면 내 PC의 GitHub 로그인 정보가 그대로 쓰입니다.
 
+AI 코딩 도구를 쓴다면 팀 공통 규칙을 내 로컬 규칙 파일로 복사합니다. 이 파일은 커밋되지 않습니다. ([안내](agent_rules/README.md))
+
+```bash
+cp docs/agent_rules/base_rules.md AGENTS.md     # Codex
+cp docs/agent_rules/base_rules.md CLAUDE.md     # Claude Code
+```
+
 **③ 가상환경 만들기**
 
 GPU를 쓰는 역할(**모델 개발, 모델 서빙**)만 VM에 가상환경을 만듭니다. 가상환경 하나가 6GB 정도라서 모두 만들면 디스크가 부족합니다.

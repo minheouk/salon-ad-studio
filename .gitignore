@@ -35,3 +35,7 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# AI 코딩 도구 규칙은 각자 로컬에서 관리합니다. 공통 규칙은 docs/agent_rules/ 에 있습니다.
+AGENTS.md
+CLAUDE.md

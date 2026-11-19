@@ -21,7 +21,6 @@
 /requirements.txt         @minheouk
 /pyproject.toml           @minheouk
 /.gitignore               @minheouk
-/AGENTS.md                @minheouk
-/CLAUDE.md                @minheouk
+/docs/agent_rules/        @minheouk
 /.github/                 @minheouk
 /.claude/                 @minheouk
