@@ -76,7 +76,6 @@ VM 관리자는 [VM 세팅 가이드](docs/vm_admin_setup.md)를 봅니다.
 ```
 salon-ad-studio/
 ├── README.md                이 문서
-├── AGENTS.md / CLAUDE.md    AI 코딩 도구가 지켜야 할 팀 규칙
 ├── requirements.txt         직접 쓰는 패키지만
 ├── configs/                 모델·프롬프트·실험 설정
 ├── assets/fonts/            광고에 쓰는 한글 폰트 (상업적 사용 가능한 것만)
@@ -85,6 +84,7 @@ salon-ad-studio/
 ├── notebooks/               실험용 노트북
 ├── scripts/                 실행 스크립트
 ├── docs/                    📋 PM: 기획, 회의록, 평가, 보고서, 의사결정, 협업일지 링크, VM 가이드
+│   └── agent_rules/         AI 코딩 도구가 지켜야 할 팀 공통 규칙과 변경 내역
 ├── src/
 │   ├── common/              🔒 공용 계약 (역할 사이에 주고받는 데이터 형식, 설정). 변경 시 PM 승인
 │   └── pipelines/
@@ -98,7 +98,10 @@ salon-ad-studio/
 
 ## 협업 규칙
 
-자세한 규칙은 [AGENTS.md](AGENTS.md)에 있습니다. AI 코딩 도구도 이 문서를 읽고 따릅니다.
+자세한 규칙은 [팀 공통 규칙](docs/agent_rules/base_rules.md)에 있습니다.
+
+`AGENTS.md`(Codex)와 `CLAUDE.md`(Claude Code)는 각자 로컬에서 관리하며 커밋하지 않습니다.
+clone한 뒤 [AI 코딩 도구 규칙 안내](docs/agent_rules/README.md)를 따라 공통 규칙을 복사해서 쓰세요.
 
 ### 브랜치
 
