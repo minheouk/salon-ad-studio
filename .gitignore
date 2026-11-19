@@ -1,0 +1,37 @@
+# 비밀 정보
+.env
+*.pem
+*.key
+id_rsa*
+google_compute_engine*
+
+# 가상환경
+.venv/
+venv/
+
+# 데이터, 생성 결과, 로그 (커밋하지 않습니다)
+data/
+outputs/
+logs/
+
+# 모델 파일과 캐시
+hf_cache/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# Python, 노트북
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# 에디터, OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

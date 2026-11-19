@@ -1,0 +1,2 @@
+# Windows와 팀 VM(Linux)에서 줄바꿈이 섞이지 않도록 저장소에는 LF로 저장합니다.
+* text=auto eol=lf
