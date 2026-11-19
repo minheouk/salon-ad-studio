@@ -28,7 +28,7 @@
 - [ ] 서비스 개발 (`src/pipelines/service/`)
 
 ## ⚠️ PM 확인 필요 (해당 시 체크)
-- [ ] 공용 파일 변경 (`src/common/`, `configs/`, `requirements.txt`, `pyproject.toml`, `AGENTS.md`, `.github/` 등)
+- [ ] 공용 파일 변경 (`src/common/`, `configs/`, `requirements.txt`, `pyproject.toml`, `docs/agent_rules/`, `.github/` 등)
 - [ ] 다른 역할의 폴더 수정
 - [ ] GPU·디스크 사용량에 영향
 <!-- 하나라도 체크했다면 이유를 적고 PM을 리뷰어로 지정해 주세요. 이 PR은 PM이 승인하고 merge합니다 -->

@@ -1,7 +1,8 @@
 # Repository rules
 
 These rules are for coding agents (Claude Code, Codex) working in this repository.
-`CLAUDE.md` imports this file. Edit the rules here only.
+Each person copies this file into their own local `AGENTS.md` (Codex) or `CLAUDE.md` (Claude Code).
+Those local files are not committed; this file and `changelog.md` in the same folder are the shared source.
 
 Section 1 outranks everything else in this file.
 It exists because an earlier team repository had to be abandoned once its code grew too complex to work in.
@@ -73,7 +74,7 @@ Ignore rules do not remove already tracked files; flag any tracked file of the k
 | Service development | `src/pipelines/service/`, `tests/service/` | diokim17 |
 
 Shared files, changed only with PM approval:
-`src/common/`, `configs/`, `requirements.txt`, `pyproject.toml`, `AGENTS.md`, `CLAUDE.md`, `.github/`, `.gitignore`.
+`src/common/`, `configs/`, `requirements.txt`, `pyproject.toml`, `docs/agent_rules/`, `.github/`, `.gitignore`.
 
 `experiments/`, `eval/` and `notebooks/` are open to everyone; change only your own files there.
 
@@ -128,7 +129,7 @@ Review and merge:
 
 | Text | Reader | Language |
 |---|---|---|
-| `AGENTS.md`, `CLAUDE.md` and other rules for coding agents | Coding agents | English |
+| `docs/agent_rules/base_rules.md`, local `AGENTS.md` / `CLAUDE.md` | Coding agents | English |
 | Python comments and docstrings | Team members | Korean |
 | Notebook markdown cells and code comments | Team members | Korean |
 | `README.md`, documents, pull request descriptions | Team members | Korean |
