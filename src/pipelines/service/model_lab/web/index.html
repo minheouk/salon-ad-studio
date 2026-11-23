@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>광고 모델 실험</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <main class="lab">
+    <header id="session" class="session" hidden>
+      <h1>광고 모델 실험</h1>
+      <button id="reset" type="button">새 실험</button>
+    </header>
+    <section id="history" class="history" aria-label="실험 기록" hidden></section>
+    <div class="compose">
+      <h1 id="welcome">어떤 광고를 만들어볼까요?</h1>
+      <form id="composer">
+        <div id="attachments" class="attachments" hidden></div>
+        <textarea id="prompt" rows="2" aria-label="광고 프롬프트" placeholder="만들고 싶은 광고를 설명해 주세요"></textarea>
+        <div class="actions">
+          <input id="images" type="file" accept="image/png,image/jpeg" multiple hidden>
+          <button id="attach" type="button">＋ 사진 첨부</button>
+          <button id="submit" type="submit" class="primary" disabled>보내기</button>
+        </div>
+      </form>
+      <div class="model-options" aria-label="실험 모델">
+        <label>범용 모델
+          <select id="general-model" aria-describedby="model-note">
+            <option value="">사용 안 함</option>
+            <option>gpt-5-nano</option>
+            <option>gpt-6-luna</option>
+            <option>gpt-5-mini</option>
+            <option>gpt-5</option>
+          </select>
+        </label>
+        <label>이미지 생성 모델
+          <select id="image-model">
+            <option value="" selected disabled>모델을 선택해 주세요</option>
+            <option value="">사용 안 함</option>
+            <option>gpt-image-1-mini</option>
+            <option>gpt-image-2</option>
+          </select>
+        </label>
+        <label>텍스트 임베딩 모델
+          <select id="embedding-model" aria-describedby="model-note">
+            <option value="">사용 안 함</option>
+            <option>text-embedding-3-small</option>
+            <option>text-embedding-3-large</option>
+          </select>
+        </label>
+      </div>
+      <p id="model-note">범용·텍스트 임베딩 모델은 선택할 수 있으며 실험 요청 연동은 준비 중입니다.</p>
+      <p id="status" role="status" hidden></p>
+      <p id="error" role="alert" hidden></p>
+    </div>
+  </main>
+  <template id="turn-template">
+    <article class="turn">
+      <div class="request">
+        <p></p>
+        <div class="attachments" hidden></div>
+      </div>
+      <figure>
+        <img class="result" alt="">
+        <figcaption><span>생성 결과</span><a>저장하기</a></figcaption>
+      </figure>
+    </article>
+  </template>
+</body>
+</html>

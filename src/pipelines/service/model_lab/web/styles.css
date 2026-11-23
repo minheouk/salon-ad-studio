@@ -1,0 +1,133 @@
+/* 모델 실험의 랜딩, 입력창, 결과 기록을 배치합니다. */
+:root {
+  color-scheme: dark;
+  font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  background: #141519;
+  color: #f2f0ec;
+  --panel: #202228;
+  --border: #3a3c43;
+  --muted: #b9b9c2;
+  --accent: #d8ef9d;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+.lab {
+  width: min(100% - 2rem, 46rem);
+  min-height: 100dvh;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+}
+.lab:not(.active) { justify-content: center; }
+.compose { padding-block: 1rem 2rem; }
+.active .compose {
+  position: sticky;
+  bottom: 0;
+  background: #141519;
+}
+h1 { margin: 0; font-size: 1.125rem; }
+#welcome {
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  letter-spacing: -.045em;
+}
+.session, .actions, figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.session { padding-block: 1.25rem; border-bottom: 1px solid var(--border); }
+.history { flex: 1; padding-block: 1.5rem 0; }
+form {
+  padding: .85rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--panel);
+}
+form:focus-within { border-color: #a3b881; }
+form.drag-over {
+  border-color: var(--accent);
+  background: #292f26;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+textarea {
+  display: block;
+  width: 100%;
+  padding: .4rem;
+  margin-bottom: .5rem;
+  resize: vertical;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+textarea::placeholder { color: var(--muted); }
+button, figcaption a {
+  padding: .48rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: .55rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: .875rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+button:hover:not(:disabled), figcaption a:hover { border-color: var(--accent); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.primary { background: var(--accent); color: #1b2411; border-color: transparent; font-weight: 700; }
+button:disabled { opacity: .5; cursor: default; }
+#status, #error { margin: .65rem .25rem 0; font-size: .875rem; }
+#status, figcaption span { color: var(--muted); }
+#error { color: #ffaaa8; }
+.turn { display: grid; gap: 1rem; margin-bottom: 1.5rem; }
+.request {
+  justify-self: end;
+  max-width: 90%;
+  border-radius: .9rem .9rem .25rem .9rem;
+  padding: .75rem 1rem;
+  background: var(--panel);
+}
+.request p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+figure { width: min(100%, 25rem); margin: 0; }
+.result { display: block; width: 100%; border-radius: .9rem; }
+figcaption { margin-top: .65rem; font-size: .875rem; }
+.attachments { display: flex; flex-wrap: wrap; gap: .5rem; }
+#attachments { margin-bottom: .65rem; }
+.request .attachments { margin-top: .65rem; }
+.attachment { position: relative; }
+.attachment img { display: block; width: 4.5rem; height: 4.5rem; object-fit: cover; border-radius: .5rem; }
+.attachment button { position: absolute; top: .2rem; right: .2rem; padding: .05rem .35rem; background: #141519; }
+
+.model-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: .75rem;
+  margin-top: .75rem;
+}
+.model-options label {
+  display: grid;
+  gap: .3rem;
+  color: var(--muted);
+  font-size: .875rem;
+}
+.model-options select {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: .35rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: .55rem;
+  background: var(--panel);
+  color: #f2f0ec;
+  font: inherit;
+}
+#model-note {
+  margin: .55rem 0 0;
+  color: var(--muted);
+  font-size: .8rem;
+}
