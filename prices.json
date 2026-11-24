@@ -1,0 +1,26 @@
+{
+  "_note": "OpenAI 공식 가격 (100만 토큰당 달러, Standard). 2026-11-23 에 https://developers.openai.com/api/docs/pricing 에서 확인. 가격이 바뀌면 이 숫자만 고치세요. 모델 이름이 정확히 없으면 가장 길게 겹치는 이름을 써요 (예: gpt-image-2-2026-04-21 -> gpt-image-2).",
+  "usd_krw": 1400,
+  "_usd_krw_note": "원화 환산용 환율. 실제 청구는 달러이고 카드사 환율로 바뀌니 대략값이에요. 필요하면 고치세요.",
+  "models": {
+    "gpt-image-2":          {"text_in": 5.00, "image_in": 8.00, "image_out": 30.00, "text_out": 0},
+    "gpt-image-2.5":        {"text_in": 5.00, "image_in": 8.00, "image_out": 30.00, "text_out": 0},
+    "gpt-image-2.6":        {"text_in": 5.00, "image_in": 8.00, "image_out": 30.00, "text_out": 0},
+    "gpt-image-1.5":        {"text_in": 5.00, "image_in": 8.00, "image_out": 32.00, "text_out": 10.00},
+    "gpt-image-1-mini":     {"text_in": 2.00, "image_in": 2.50, "image_out": 8.00,  "text_out": 0},
+    "chatgpt-image-latest": {"text_in": 5.00, "image_in": 8.00, "image_out": 32.00, "text_out": 10.00}
+  },
+  "_text_models_note": "디자인 인식(사진 분석) 모델 가격. input / cached_input / output (100만 토큰당 달러, 짧은 문맥 기준). 2026-11-23 확인.",
+  "text_models": {
+    "gpt-5.4-nano": {"input": 0.20, "cached_input": 0.02,  "output": 1.25},
+    "gpt-5.4-mini": {"input": 0.75, "cached_input": 0.075, "output": 4.50},
+    "gpt-5.4":      {"input": 2.50, "cached_input": 0.25,  "output": 15.00},
+    "gpt-5.5":      {"input": 5.00, "cached_input": 0.50,  "output": 30.00},
+    "gpt-5-nano":   {"input": 0.05, "cached_input": 0.005, "output": 0.40},
+    "gpt-5-mini":   {"input": 0.25, "cached_input": 0.025, "output": 2.00},
+    "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02,  "output": 1.20},
+    "gpt-6-luna":   {"input": 0.10, "cached_input": 0.01,  "output": 0.50},
+    "gpt-6-sol":    {"input": 2.00, "cached_input": 0.20,  "output": 10.00},
+    "gpt-4.1-mini": {"input": 0.40, "cached_input": 0.10,  "output": 1.60}
+  }
+}

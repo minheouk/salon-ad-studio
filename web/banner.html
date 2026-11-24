@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>네일샷 AI · 네일 배너 만들기</title>
+<style>
+  :root { --ink: #2b2230; --muted: #7b7082; --line: #ece4ee; --bg: #fbf8fb; --card: #fff; --accent: #d6336c; --accent-soft: #fde8ef; --ok: #1f8a5b; --bad: #b42318; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; color: var(--ink); background: var(--bg); }
+  body.lb-open { overflow: hidden; }
+  header { padding: 28px 24px 8px; max-width: 1280px; margin: 0 auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 24px; letter-spacing: -0.3px; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+  header a { color: var(--muted); font-size: 13px; }
+  .usage-top { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  main { max-width: 1280px; margin: 0 auto; padding: 16px 24px 48px; display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 960px) { main { grid-template-columns: 1fr; padding: 12px 16px 40px; } header { padding: 22px 16px 6px; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .side { position: sticky; top: 16px; }
+  @media (max-width: 960px) { .side { position: static; } }
+  .step { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 16px; font-weight: 700; }
+  .step b { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+  .step small { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 13px; }
+
+  /* 업로드 */
+  .uploads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .thumb, .add { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #f3eef4; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .no { position: absolute; left: 6px; top: 6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: rgba(43,34,48,.72); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .thumb .rm { position: absolute; right: 6px; top: 6px; width: 24px; height: 24px; border: 0; border-radius: 50%; background: rgba(43,34,48,.72); color: #fff; cursor: pointer; font-size: 14px; line-height: 1; }
+  .thumb .rm:hover { background: var(--bad); }
+  .add { border: 2px dashed #e2d3e6; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--muted); font-size: 12px; cursor: pointer; text-align: center; padding: 6px; transition: background .15s; }
+  .add strong { font-size: 26px; font-weight: 300; color: var(--accent); line-height: 1; }
+  .add.over, .uploads.over .add { background: var(--accent-soft); border-color: var(--accent); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .field { margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .field input { width: 100%; margin-top: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; color: var(--ink); }
+  details.field summary { cursor: pointer; }
+  .speed { display: flex; gap: 8px; margin-top: 16px; }
+  .speed label { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 9px 6px; text-align: center; font-size: 13px; cursor: pointer; }
+  .speed label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+  .speed input { display: none; }
+  .speed small { color: var(--muted); font-weight: 400; }
+  .go { width: 100%; margin-top: 18px; padding: 15px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .go:disabled { background: #e6c3d1; cursor: not-allowed; }
+  .flow { margin-top: 16px; padding: 12px; border-radius: 12px; background: #f7f3f8; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .flow b { color: var(--ink); }
+  .flow-t { font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .fs { display: flex; gap: 6px; margin-top: 6px; }
+  .fs > span { flex: none; color: var(--accent); font-weight: 700; }
+  .eff { display: flex; align-items: center; gap: 6px; margin-top: 5px; color: var(--ink); font-weight: 600; }
+  .eff select, .nailopt select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 12px; color: var(--ink); background: #fff; }
+  .eff select { flex: 1; }
+  .nailopt { margin-top: 16px; font-size: 13px; }
+  .nailopt .lbl { color: var(--ink); font-weight: 600; }
+  .nailopt .lbl small { color: var(--muted); font-weight: 400; }
+  .nailopt .row { display: flex; gap: 8px; margin-top: 6px; }
+  .nailopt select { flex: 1; min-width: 0; font-size: 13px; padding: 9px 8px; }
+  .splitopt { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; cursor: pointer; line-height: 1.5; }
+  .splitopt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .splitopt input { margin-top: 3px; accent-color: var(--accent); }
+  .splitopt small { display: block; color: var(--muted); }
+  .item-head .lab { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .err { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #fff0f0; color: var(--bad); font-size: 13px; }
+
+  /* 결과 */
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar .step { margin: 0; }
+  .toolbar .grow { flex: 1; }
+  .btn { padding: 10px 14px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn svg { width: 16px; height: 16px; }
+  .progress { font-size: 13px; color: var(--muted); }
+  .empty { border: 1px dashed var(--line); border-radius: 14px; padding: 60px 20px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.8; background: #fff; }
+  .items { display: flex; flex-direction: column; gap: 16px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .item-head { display: flex; align-items: center; gap: 12px; }
+  .item-head img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
+  .item-head .t { font-weight: 700; }
+  .item-head .s { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .item-head .cost { margin-left: auto; font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0; }
+  .steps div { position: relative; padding: 7px 4px 7px 26px; border-radius: 8px; background: #f7f3f8; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .steps div::before { content: ""; position: absolute; left: 9px; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; background: #d9cfdc; }
+  .steps .run { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
+  .steps .run::before { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+  .steps .done { color: var(--ink); }
+  .steps .done::before { background: var(--ok); }
+  .steps .fail { background: #fff0f0; color: var(--bad); }
+  .steps .fail::before { background: var(--bad); }
+  @keyframes pulse { 50% { transform: scale(1.5); opacity: .5; } }
+  @media (max-width: 600px) { .steps { grid-template-columns: repeat(2, 1fr); } }
+  .item-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); gap: 12px; }
+  @media (max-width: 700px) { .item-body { grid-template-columns: 1fr; } }
+  .pane { position: relative; border-radius: 12px; background: #f3eef4; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .pane img { width: 100%; height: 100%; object-fit: contain; display: block; cursor: zoom-in; }
+  .pane .ph { color: var(--muted); font-size: 12px; text-align: center; padding: 10px; line-height: 1.6; }
+  .pane .tag { position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 999px; background: rgba(43,34,48,.72); color: #fff; font-size: 11px; pointer-events: none; }
+  .pane .tag.pv { left: auto; right: 8px; background: var(--accent); }
+  .pane.hand { aspect-ratio: 4 / 5; }
+  .pane img.preview { filter: saturate(.85) blur(.3px); }
+  .spin { width: 28px; height: 28px; border: 3px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: r 0.9s linear infinite; margin: 0 auto 8px; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .why { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .why b { color: var(--ink); }
+  .plan { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 13px; }
+  .plan summary { cursor: pointer; font-weight: 700; }
+  .plan summary span { font-weight: 400; color: var(--muted); }
+  .plan dl { display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px; margin: 10px 0 0; }
+  .plan dt { color: var(--muted); }
+  .plan dd { margin: 0; line-height: 1.55; }
+  .plan .copy b { font-size: 15px; }
+  .plan .prompt { font-size: 11px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+  .swatches span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; }
+  .swatches i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.08); }
+  .item-foot { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .item-err { margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: #fff0f0; color: var(--bad); font-size: 13px; }
+  .warn { color: var(--bad); }
+
+  /* 미리보기 (여러 장 차례로, 확대/축소) */
+  .lb { position: fixed; inset: 0; z-index: 100; background: rgba(18, 14, 20, .98); display: flex; flex-direction: column; color: #fff; }
+  .lb-top { display: flex; align-items: center; gap: 12px; padding: 12px 14px; z-index: 3; }
+  .lb-title { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lb-title b { font-variant-numeric: tabular-nums; margin-right: 8px; }
+  .lb-title small { color: rgba(255,255,255,.6); }
+  .seg { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.12); }
+  .seg button { border: 0; background: transparent; color: rgba(255,255,255,.75); font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .seg button.on { background: #fff; color: var(--ink); font-weight: 700; }
+  .lb-x { width: 42px; height: 42px; border: 0; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; font-size: 20px; cursor: pointer; flex: none; }
+  .lb-x:hover { background: rgba(255,255,255,.26); }
+  .lb-view { position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
+  .lb-view.drag { cursor: grabbing; }
+  .lb-view img { position: absolute; top: 0; left: 0; transform-origin: 0 0; max-width: none; max-height: none; will-change: transform; -webkit-user-drag: none; }
+  .lb-nav { position: absolute; top: 50%; z-index: 3; width: 52px; height: 52px; margin-top: -26px; border: 0; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .lb-nav:hover { background: rgba(255,255,255,.28); }
+  .lb-nav:disabled { opacity: .2; cursor: default; }
+  .lb-prev { left: 14px; } .lb-next { right: 14px; }
+  .lb-bottom { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 14px 16px; z-index: 3; }
+  .strip { display: flex; gap: 8px; max-width: 100%; overflow-x: auto; padding: 2px; }
+  .strip button { flex: none; width: 96px; height: 64px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: #000; cursor: pointer; opacity: .55; position: relative; }
+  .strip button.on { border-color: #fff; opacity: 1; }
+  .strip button:hover { opacity: 1; }
+  .strip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .strip span { position: absolute; left: 4px; bottom: 3px; font-size: 11px; background: rgba(0,0,0,.6); padding: 0 5px; border-radius: 4px; }
+  .lb-bar { display: flex; align-items: center; gap: 4px; padding: 5px; border-radius: 999px; background: rgba(255,255,255,.12); flex-wrap: wrap; justify-content: center; }
+  .lb-bar button, .lb-bar label { min-width: 38px; height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: #fff; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .lb-bar button.z { font-size: 18px; }
+  .lb-bar button:hover, .lb-bar label:hover { background: rgba(255,255,255,.16); }
+  .lb-bar .pct { min-width: 52px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .lb-bar .sep { width: 1px; height: 20px; background: rgba(255,255,255,.2); margin: 0 4px; }
+  .lb-help { color: rgba(255,255,255,.45); font-size: 12px; text-align: center; }
+  @media (max-width: 700px) { .lb-help { display: none; } .lb-nav { width: 42px; height: 42px; } .strip button { width: 72px; height: 48px; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>네일샷 <span>AI</span> · 네일 장면 사진 만들기</h1>
+    <p>네일 팁 사진을 1장 올리면, 세트(줄)마다 nailhand 의 손 장면 사진(와인 · 머그컵 등) 중 어울리는 사진을 골라 그 세트를 손톱에 그대로 입히고, 배경과 음료 색만 세트에 어울리게 바꿔 드려요. 상호명 · 배너 문구는 넣지 않아요.</p>
+    <div class="usage-top" id="usageTop" hidden></div>
+  </div>
+
+</header>
+<main>
+  <section class="card side">
+    <div class="step"><b>1</b> 네일 사진 올리기 <small id="countText">0 / 1장</small></div>
+    <div class="uploads" id="uploads"></div>
+    <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
+    <div class="hint">인스타 캡처, 손 사진 등 아무 네일 사진이나 괜찮아요. 끌어다 놓기 · 붙여넣기(Ctrl+V)도 돼요. 사진은 1장만 올릴 수 있어요 (새로 올리면 바뀌어요). JPG/PNG/WebP, 10MB 이하.</div>
+    <label class="splitopt"><input type="checkbox" id="splitSets">
+      <span><b>팁 모음 사진 · 세트 나누기</b><small>사진 1장에 네일 팁 세트(5개씩)가 여러 줄 있으면, AI가 세트를 찾아 세트마다 1장씩 만들어요 (예: 7세트 → 7장, 최대 <span id="maxSets">12</span>장). 잘린 세트는 빼요.</small></span></label>
+
+    <label class="field" hidden>상호명 (선택 · 배너에 작게 들어가요)
+      <input id="brand" maxlength="30" placeholder="예) 네일샷 스튜디오">
+    </label>
+    <details class="field">
+      <summary>추가 요청 (선택)</summary>
+      <input id="desc" maxlength="300" placeholder="예) 크리스마스 분위기, 따뜻한 조명 (배경 · 음료)">
+      <div class="hint">배경 · 음료 분위기에 반영돼요. 네일 디자인은 바뀌지 않아요.</div>
+    </details>
+
+    <div class="speed">
+      <label><input type="radio" name="quality" value="fast"> 빠르게 <small>(저렴)</small></label>
+      <label><input type="radio" name="quality" value="normal" checked> 기본</label>
+      <label><input type="radio" name="quality" value="high"> 고화질 <small>(느림)</small></label>
+    </div>
+    <button class="go" id="go" disabled>배너 만들기</button>
+    <div class="err" id="err" hidden></div>
+
+    <div class="nailopt">
+      <div class="lbl">손톱 길이 · 모양 <small>길고 뾰족한 디자인도 끝까지 그려요</small></div>
+      <div class="row">
+        <select id="nailLength" aria-label="손톱 길이">
+          <option value="auto" selected>길이: 자동 (사진대로)</option>
+          <option value="keep">원본 손 길이 유지</option>
+          <option value="medium">중간</option>
+          <option value="long">길게</option>
+          <option value="extra_long">아주 길게</option>
+        </select>
+        <select id="nailShape" aria-label="손톱 모양">
+          <option value="auto" selected>모양: 자동 (사진대로)</option>
+          <option value="stiletto">스틸레토 (뾰족)</option>
+          <option value="almond">아몬드</option>
+          <option value="coffin">코핀 (발레리나)</option>
+          <option value="square">스퀘어</option>
+          <option value="squoval">스퀘오벌</option>
+          <option value="oval">오벌</option>
+          <option value="round">라운드</option>
+        </select>
+      </div>
+      <div class="hint">자동이면 ①에서 인식한 길이·모양대로 손톱을 손끝 밖으로 늘여 그려요. 잘려 보이면 '길게'·'아주 길게'를 직접 골라 보세요.</div>
+    </div>
+
+    <div class="flow">
+      <div class="flow-t">사진마다 이렇게 만들어요</div>
+      <div class="fs"><span>①</span><div><b id="mA">인식 모델</b>이 네일 디자인을 글로 정리하고, <span id="poolText">준비된 손 사진 중 어울리는 손</span>을 골라요
+        <label class="eff">Reasoning Effort <select id="effA" class="effSel"></select></label></div></div>
+      <div class="fs"><span>②</span><div><b id="mI">이미지 모델</b>이 정한 손가락 순서대로 세트를 손톱에 그대로 입히고, 배경 · 음료 색만 바꿔요
+        <label class="eff" hidden>입히는 방식 <select id="applyMode" class="effSel">
+          <option value="">기본 (settings.yaml)</option>
+          <option value="mask">마스크 (손 원본 그대로, 가장 정확)</option>
+          <option value="free">마스크 없이 (통째로 다시 그림)</option>
+          <option value="direct">건너뛰고 배너에서 한 번에 (절반 비용)</option>
+          <option value="scene">장면 사진 (nailhand · 음료 색 · 배경도 바꾸기)</option>
+        </select></label>
+        <label class="eff" id="sceneBannerRow">장면 사진 다음 <select id="sceneBanner" class="effSel">
+          <option value="">기본 (settings.yaml)</option>
+          <option value="off">장면 사진이 완성품 (③④ 건너뜀)</option>
+          <option value="on">③④ 배너까지 만들기</option>
+        </select></label></div></div>
+      <div class="fs"><span>③</span><div><b id="mP">인식 모델</b>이 완성 사진을 보고 배경 · 배너 계획서를 써요
+        <label class="eff">Reasoning Effort <select id="effP" class="effSel"></select></label></div></div>
+      <div class="fs"><span>④</span><div><b class="mI">이미지 모델</b>이 계획서대로 그 손 사진으로 배너를 만들어요
+        <label class="eff">손 자세 <select id="pose" class="effSel">
+          <option value="">기본 (settings.yaml)</option>
+          <option value="auto">디자인에 맞게 바꾸기</option>
+          <option value="keep">원래 자세 유지 (디자인 가장 정확)</option>
+        </select></label></div></div>
+      <div class="hint">Effort 를 높이면 더 꼼꼼히 보지만 느려지고 비용이 조금 늘어요. 바꾼 값은 이 브라우저에 기억돼요.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="toolbar">
+      <div class="step"><b>2</b> 결과</div>
+      <span class="progress" id="progress"></span>
+      <span class="grow"></span>
+      <button class="btn primary" id="viewAll" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M10.5 7.5v6M7.5 10.5h6"/></svg>
+        한꺼번에 미리보기
+      </button>
+      <button class="btn" id="zipAll" disabled>전체 다운로드 (ZIP)</button>
+    </div>
+    <div class="empty" id="empty">왼쪽에서 네일 팁 사진을 올리고 <b>장면 사진 만들기</b>를 눌러 주세요.<br>완성된 사진은 다운로드하기 전에 <b>한꺼번에 미리보기</b>로 차례로 넘기며 확대 · 축소해 볼 수 있어요.</div>
+    <div class="items" id="items"></div>
+  </section>
+</main>
+
+<!-- 미리보기: 완성 배너를 차례로 넘기며 확대/축소 -->
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="배너 미리보기">
+  <div class="lb-top">
+    <div class="lb-title" id="lbTitle"></div>
+    <div class="seg" id="lbMode">
+      <button type="button" data-mode="banner" class="on">배너</button>
+      <button type="button" data-mode="nail">네일 손 사진</button>
+    </div>
+    <button class="lb-x" id="lbClose" type="button" aria-label="닫기" title="닫기 (Esc)">✕</button>
+  </div>
+  <div class="lb-view" id="lbView">
+    <img id="lbImg" alt="" draggable="false">
+    <button class="lb-nav lb-prev" id="lbPrev" type="button" aria-label="이전" title="이전 (←)">‹</button>
+    <button class="lb-nav lb-next" id="lbNext" type="button" aria-label="다음" title="다음 (→)">›</button>
+  </div>
+  <div class="lb-bottom">
+    <div class="strip" id="lbStrip"></div>
+    <div class="lb-bar">
+      <button type="button" class="z" id="lbOut" aria-label="축소" title="축소 (-)">−</button>
+      <span class="pct" id="lbPct">100%</span>
+      <button type="button" class="z" id="lbIn" aria-label="확대" title="확대 (+)">+</button>
+      <button type="button" id="lbFit" title="화면에 맞춤 (0)">맞춤</button>
+      <button type="button" id="lb100" title="원본 크기 (1)">100%</button>
+      <span class="sep"></span>
+      <label title="다음 장으로 넘겨도 같은 확대 · 위치로 보기 (같은 곳 비교)"><input type="checkbox" id="lbKeep"> 확대 유지</label>
+      <span class="sep"></span>
+      <button type="button" id="lbDl" title="이 이미지 다운로드">이 장 다운로드</button>
+    </div>
+    <div class="lb-help">← → 넘기기 · 휠 · 두 손가락으로 확대/축소 · 끌어서 이동 · 두 번 눌러 확대 · 맞춤 상태에서 옆으로 밀어 넘기기</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
+const money = (usd, krw) => usd == null ? '' : `$${usd.toFixed(4)}` + (krw != null ? ` (약 ${Math.round(krw).toLocaleString('ko-KR')}원)` : '');
+const STEPS = [['analyzing', '인식 · 손 고르기'], ['applying', '네일 입히기'], ['planning', '배너 계획서'], ['banner', '배너 만들기']];
+let MAX = 1, BANNER_RATIO = '3 / 2', KRW = 0, files = [], items = [], busy = false;
+
+function setErr(m) { const e = $('err'); e.textContent = m || ''; e.hidden = !m; }
+function showUsageTop(u) {
+  if (!u || !u.today) return;
+  KRW = u.usd_krw || 0;
+  const t = $('usageTop'); t.hidden = false;
+  t.textContent = `오늘 ${u.today.count}장 ${money(u.today.usd, u.today.krw)} · 전체 ${u.total.count}장 ${money(u.total.usd, u.total.krw)}`;
+}
+function loadUsage() { fetch('/api/usage').then(r => r.ok ? r.json() : null).then(showUsageTop).catch(() => {}); }
+// Reasoning Effort (단계별) · 손톱 길이/모양 : 고른 값은 브라우저에 기억
+const EFFORTS = [['none', 'none (추론 안 함, 가장 빠름)'], ['minimal', 'minimal'], ['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['xhigh', 'xhigh'], ['max', 'max (가장 꼼꼼, 느림)']];
+const LENGTH_KO = { keep: '원본 길이', short: '짧게', medium: '중간', long: '길게', extra_long: '아주 길게', unknown: '모름' };
+const SHAPE_KO = { stiletto: '스틸레토', almond: '아몬드', coffin: '코핀', square: '스퀘어', squoval: '스퀘오벌', oval: '오벌', round: '라운드', unknown: '' };
+function fillEffort(sel, def) {
+  sel.innerHTML = `<option value="">기본 (settings.yaml: ${esc(def || '모델 기본값')})</option>`
+    + EFFORTS.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
+}
+const remember = ['effA', 'effP', 'nailLength', 'nailShape', 'pose', 'applyMode', 'sceneBanner'];
+const MODE_KO = { mask: '마스크', free: '마스크 없이', direct: '배너에서 한 번에', scene: '장면 사진' };
+let HEALTH = {};
+const splitOn = () => $('splitSets').checked;
+$('splitSets').checked = localStorage.getItem('nailshot.splitSets') !== '0';      // 기본 켜짐
+$('splitSets').addEventListener('change', () => { localStorage.setItem('nailshot.splitSets', splitOn() ? '1' : '0'); renderUploads(); });
+// 이 화면은 '장면 사진' 방식만 써요 (nailhand 사진에 세트를 입히고 배경 · 음료 색만 바꿈, 배너 · 상호명 없음)
+const effMode = () => 'scene';
+const effSceneBanner = () => false;
+function updateModeUi() {
+  const sc = effMode() === 'scene';
+  $('sceneBannerRow').hidden = true;
+  document.querySelectorAll('.flow .fs').forEach((el, i) => { if (i >= 2) el.hidden = true; });
+  $('poolText').textContent = sc ? `nailhand 장면 사진${HEALTH.scene_count ? ' ' + HEALTH.scene_count + '장' : ''} 중 분위기에 맞는 사진 1장과 음료 색 · 배경`
+    : '준비된 손 사진 중 어울리는 손';
+  renderUploads();
+}
+['applyMode', 'sceneBanner'].forEach(id => $(id).addEventListener('change', updateModeUi));
+function restoreOpts() { remember.forEach(id => { const v = localStorage.getItem('nailshot.' + id); if (v != null && [...$(id).options].some(o => o.value === v)) $(id).value = v; }); }
+remember.forEach(id => $(id).addEventListener('change', () => localStorage.setItem('nailshot.' + id, $(id).value)));
+fillEffort($('effA'), ''); fillEffort($('effP'), ''); restoreOpts(); updateModeUi();
+
+fetch('/api/health').then(r => r.json()).then(h => {
+  HEALTH = h;
+  if (h.max_sets) $('maxSets').textContent = h.max_sets;
+  $('sceneBanner').options[0].textContent = `기본 (settings.yaml: ${h.scene_banner ? '배너까지' : '장면 사진이 완성품'})`;
+  fillEffort($('effA'), h.analysis_effort); fillEffort($('effP'), h.plan_effort);
+  $('pose').options[0].textContent = `기본 (settings.yaml: ${h.pose === 'keep' ? '원래 자세 유지' : '디자인에 맞게 바꾸기'})`;
+  $('applyMode').options[0].textContent = `기본 (settings.yaml: ${MODE_KO[h.apply_mode] || '마스크'})`;
+  restoreOpts();
+  if (h.fake || !h.analysis_model) document.querySelectorAll('.eff').forEach(e => e.title = '화면 확인 모드(--fake)에서는 쓰이지 않아요');
+  if (h.plan_model) $('mP').textContent = h.plan_model;
+  MAX = h.max_designs || 1;
+  const [w, hh] = String(h.banner_size || '1536x1024').split('x').map(Number);
+  if (w && hh) BANNER_RATIO = `${w} / ${hh}`;
+  if (h.brand && !$('brand').value) $('brand').value = h.brand;
+  updateModeUi();
+  if (h.analysis_model) document.querySelectorAll('#mA, .mA').forEach(e => e.textContent = h.analysis_model);
+  if (h.model) document.querySelectorAll('#mI, .mI').forEach(e => e.textContent = h.fake ? 'fake(화면 확인용)' : h.model);
+  renderUploads();
+}).catch(() => setErr('서버에 연결할 수 없어요. start_server.bat 이 켜져 있는지 확인하세요.'));
+loadUsage();
+
+// ---------------- 1. 사진 올리기 (1장, settings.yaml banner.max_designs) ----------------
+function addFiles(list) {
+  if (busy) return;
+  setErr('');
+  if (MAX === 1 && list.length) {      // 1장만: 새 사진이 오면 바꿔요
+    if (list.length > 1) setErr('사진은 1장만 올릴 수 있어요. 첫 번째 사진만 올렸어요.');
+    list = [list[0]];
+    if (files.length && /^image\/(png|jpeg|webp)$/.test(list[0].type) && list[0].size <= 10 * 1024 * 1024) {
+      files.forEach(f => URL.revokeObjectURL(f.url)); files = [];
+    }
+  }
+  for (const f of list) {
+    if (files.length >= MAX) { setErr(`사진은 최대 ${MAX}장까지 올릴 수 있어요.`); break; }
+    if (!/^image\/(png|jpeg|webp)$/.test(f.type)) { setErr('JPG, PNG, WebP 이미지만 올릴 수 있어요.'); continue; }
+    if (f.size > 10 * 1024 * 1024) { setErr(`${f.name}: 10MB 이하 사진을 올려 주세요.`); continue; }
+    files.push({ file: f, url: URL.createObjectURL(f) });
+  }
+  renderUploads();
+}
+function renderUploads() {
+  const box = $('uploads'); box.innerHTML = '';
+  files.forEach((f, i) => {
+    const d = document.createElement('div'); d.className = 'thumb';
+    d.innerHTML = `<img src="${f.url}" alt="${i + 1}번 사진"><span class="no">${i + 1}</span>`
+      + `<button class="rm" type="button" title="빼기" aria-label="${i + 1}번 사진 빼기">✕</button>`;
+    if (MAX === 1) { d.title = '눌러서 다른 사진으로 바꾸기'; d.style.cursor = 'pointer'; d.querySelector('img').onclick = () => { if (!busy) $('file').click(); }; }
+    d.querySelector('.rm').onclick = () => { if (busy) return; URL.revokeObjectURL(f.url); files.splice(i, 1); renderUploads(); };
+    box.appendChild(d);
+  });
+  if (files.length < MAX) {
+    const a = document.createElement('div'); a.className = 'add'; a.tabIndex = 0; a.setAttribute('role', 'button');
+    a.innerHTML = MAX === 1 ? '<strong>+</strong>사진 선택<br>(1장)' : `<strong>+</strong>${files.length ? '사진 더 올리기' : '사진 선택'}<br>(${MAX - files.length}장 더 가능)`;
+    a.onclick = () => { if (!busy) $('file').click(); };
+    a.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); a.click(); } };
+    box.appendChild(a);
+  }
+  $('countText').textContent = `${files.length} / ${MAX}장`;
+  $('file').multiple = MAX > 1;
+  $('go').disabled = busy || !files.length;
+  const noun = (effMode() === 'scene' && !effSceneBanner()) ? '장면 사진' : '배너';
+  $('go').textContent = busy ? '만드는 중...' : !files.length ? `${noun} 만들기`
+    : splitOn() ? `세트 나눠서 ${noun} 만들기` : `${noun} ${files.length}장 만들기`;
+}
+$('file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+const up = $('uploads');
+['dragenter', 'dragover'].forEach(ev => up.addEventListener(ev, e => { e.preventDefault(); up.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => up.addEventListener(ev, e => { e.preventDefault(); up.classList.remove('over'); }));
+up.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
+window.addEventListener('paste', e => {
+  const imgs = [...(e.clipboardData?.items || [])].filter(i => i.type.startsWith('image/')).map(i => i.getAsFile());
+  if (imgs.length) addFiles(imgs);
+});
+
+// ---------------- 2. 결과 카드 ----------------
+function itemCard(it) {
+  const el = document.createElement('article'); el.className = 'item';
+  el.innerHTML = `
+    <div class="item-head">
+      <img src="${it.thumb}" alt="">
+      <div><div class="t">${it.no}번 ${it.sceneOnly ? '장면 사진' : '배너'}</div>${it.label ? `<div class="lab">${esc(it.label)}</div>` : ''}<div class="s" data-k="status">기다리는 중...</div></div>
+      <div class="cost" data-k="cost"></div>
+    </div>
+    <div class="steps">${STEPS.map(([k, t]) => `<div data-step="${k}">${t}</div>`).join('')}</div>
+    <div class="item-body">
+      <div>
+        <div class="pane hand" data-k="nailPane"><div class="ph">손 사진</div></div>
+        <div class="why" data-k="why"></div>
+      </div>
+      <div class="pane banner" data-k="bannerPane" style="aspect-ratio:${BANNER_RATIO}"><div class="ph">배너</div></div>
+    </div>
+    <div data-k="plan"></div>
+    <div class="item-err" data-k="err" hidden></div>
+    <div class="item-foot" data-k="foot" hidden>
+      <button class="btn" type="button" data-k="zoom">크게 보기</button>
+      <a class="btn" data-k="dl" download>배너 다운로드</a>
+      <a class="btn" data-k="dlNail" download>네일 손 사진 다운로드</a>
+    </div>`;
+  const q = k => el.querySelector(`[data-k="${k}"]`);
+  it.el = el; it.q = q;
+  q('zoom').onclick = () => openViewer(it.no - 1, 'banner');
+  return el;
+}
+function setStep(it, step, state) {
+  const idx = STEPS.findIndex(s => s[0] === step);
+  it.el.querySelectorAll('.steps div').forEach((d, i) => {
+    d.classList.remove('run', 'done', 'fail');
+    if (i < idx) d.classList.add('done');
+    else if (i === idx) d.classList.add(state || 'run');
+  });
+}
+function paneImage(pane, src, opts = {}) {
+  pane.innerHTML = `<img src="${src}" alt="" class="${opts.preview ? 'preview' : ''}">`
+    + (opts.tag ? `<span class="tag">${esc(opts.tag)}</span>` : '') + (opts.preview ? '<span class="tag pv">그리는 중</span>' : '');
+  if (opts.onclick) pane.querySelector('img').onclick = opts.onclick;
+}
+function paneWait(pane, text) { pane.innerHTML = `<div class="ph"><div class="spin"></div>${esc(text)}</div>`; }
+function planHtml(p) {
+  const sw = (p.palette || []).map(c => `<span><i style="background:${esc(c.hex)}"></i>${esc(c.hex)} ${esc(c.name)}</span>`).join('');
+  return `<details class="plan"><summary>배너 디자인 계획서 <span>· ${esc(p.concept_ko)}</span></summary><dl>
+    <dt>콘셉트</dt><dd>${esc(p.concept_ko)}</dd>
+    <dt>분위기</dt><dd>${esc(p.mood_ko)}</dd>
+    <dt>문구</dt><dd class="copy"><b>${esc(p.headline_ko)}</b><br>${esc(p.subcopy_ko)}<br>[ ${esc(p.cta_ko)} ]${p.brand ? `<br><small>상호: ${esc(p.brand)}</small>` : ''}</dd>
+    <dt>색상</dt><dd class="swatches">${sw}</dd>
+    <dt>손 자세</dt><dd>${p.pose_change ? '<b>바꿈</b> · ' : '유지 · '}${esc(p.pose_ko)}</dd>
+    <dt>배경</dt><dd>${esc(p.background_ko)}</dd>
+    <dt>레이아웃</dt><dd>${esc(p.layout_ko)}</dd>
+    <dt>글꼴</dt><dd>${esc(p.typography_ko)}</dd>
+    <dt>연출 지시</dt><dd class="prompt">${esc(p.image_prompt_en)}</dd>
+    <dt>작성</dt><dd>${esc(p.model)} · effort ${esc(p.reasoning_effort || '기본')}${p.usd != null ? ` · $${p.usd.toFixed(4)}` : ''}</dd>
+  </dl></details>`;
+}
+const toBlobUrl = async dataUrl => { const b = await (await fetch(dataUrl)).blob(); return { blob: b, url: URL.createObjectURL(b) }; };
+function ready() { return items.filter(it => it.banner); }
+function updateProgress() {
+  const done = items.filter(it => it.banner || it.error).length, ok = ready().length;
+  $('progress').textContent = items.length ? `${done} / ${items.length} 완료` + (ok < done ? ` (실패 ${done - ok})` : '') : '';
+  $('viewAll').disabled = !ok; $('zipAll').disabled = !ok || busy;
+}
+
+// ---------------- 3. 만들기 (SSE) ----------------
+async function readEvents(r, on) {
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true }).replace(/\r/g, '');
+    let i;
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+      let ev = 'message', data = '';
+      chunk.split('\n').forEach(line => {
+        if (line.startsWith('event:')) ev = line.slice(6).trim();
+        else if (line.startsWith('data:')) data += line.slice(5).trim();
+      });
+      if (data) await on(ev, JSON.parse(data));
+    }
+  }
+}
+async function onEvent(ev, d) {
+  if (ev === 'sets_stage') { $('progress').textContent = d.text; return; }
+  if (ev === 'sets') {          // 세트 나누기 결과 -> 세트마다 카드
+    const box = $('items'); box.innerHTML = '';
+    const sc = effMode() === 'scene', so = sc && !effSceneBanner();
+    items = d.items.map(x => ({ no: x.item + 1, thumb: x.thumb, label: x.label, setCrop: x.is_set !== false ? x.thumb : null, scene: sc, sceneOnly: so }));
+    items.forEach(it => box.appendChild(itemCard(it)));
+    if (!items.length) $('empty').hidden = false;
+    updateProgress();
+    if (d.dropped) setErr(`세트가 많아서 앞의 ${d.total}개만 만들어요 (${d.dropped}개 뺌, settings.yaml sheet.max_sets).`);
+    return;
+  }
+  if (ev === 'done') {
+    const s = `${d.ok}장 완성` + (d.failed ? ` · 실패 ${d.failed}장` : '') + (d.usd != null ? ` · 이번 비용 ${money(d.usd, d.krw)}` : '');
+    $('progress').textContent = s;
+    loadUsage();
+    return;
+  }
+  const it = items[d.item]; if (!it) { if (ev === 'item_error') setErr(d.message); return; }
+  const q = it.q;
+  if (ev === 'item_stage') {
+    setStep(it, d.step); q('status').textContent = d.text;
+    if (d.step === 'applying' && it.sceneOnly) paneWait(q('bannerPane'), '네일 · 음료 · 배경 바꾸는 중');
+    else if (d.step === 'applying' && !d.text.startsWith('건너뜀')) paneWait(q('nailPane'), '네일 입히는 중');
+    if (d.step === 'planning') paneWait(q('bannerPane'), '배너 계획서 쓰는 중');
+    if (d.step === 'banner') paneWait(q('bannerPane'), '배너 그리는 중');
+  } else if (ev === 'item_design') {
+    it.hand = d.hand;
+    const ds = d.design;
+    q('why').innerHTML = (ds ? `인식: <b>${esc(ds.summary_ko)}</b>${ds.accent_nails ? '<br>포인트: ' + esc(ds.accent_nails) : ''}`
+        + `<br><small>손톱 ${esc(LENGTH_KO[ds.nail_length] || ds.nail_length)} ${esc(SHAPE_KO[ds.nail_shape] ?? ds.nail_shape)} · effort ${esc(ds.reasoning_effort || '기본')}${ds.cached_result ? ' · 이전 인식 재사용' : ''}</small><br>` : '')
+      + (ds && ds.scene_ko ? `음료 · 배경: <b>${esc(ds.scene_ko)}</b><br>` : '')
+      + (ds && ds.fingers_ko ? `팁 배정 (${ds.hand_side === 'both' ? '양손 · 손마다 한 줄 전부' : ds.hand_side === 'left' ? '왼손' : '오른손'} · 1번 팁부터 엄지): <b>${esc(ds.fingers_ko)}</b><br>` : '')
+      + `${it.scene ? '장면' : '손'}: <b>${esc(d.hand.label)}</b> ${d.hand_auto ? (d.hand_reason_ko ? '· ' + esc(d.hand_reason_ko) : '· AI 선택') : '<span class="warn">· 자동 선택 실패, 순서대로 배정</span>'}`;
+    paneImage(q('nailPane'), d.hand.url, { tag: it.scene ? '고른 장면 사진 (바꾸기 전)' : '선택된 손 (입히기 전)' });
+  } else if (ev === 'item_partial') {
+    paneImage(q(d.phase === 'nail' ? 'nailPane' : 'bannerPane'), d.image, { preview: true });
+  } else if (ev === 'item_nail') {
+    const { blob, url } = await toBlobUrl(d.image);
+    it.nail = { blob, url, w: d.width, h: d.height };
+    paneImage(q('nailPane'), url, { tag: '네일 입힌 손', onclick: () => openViewer(it.no - 1, 'nail') });
+    const k = d.nails, x = d.nail_extend;
+    if (x && x.ratio > 0)
+      q('why').innerHTML += `<br>긴 손톱 적용: <b>${esc(LENGTH_KO[x.length] || x.length)}${SHAPE_KO[x.shape] ? ' · ' + esc(SHAPE_KO[x.shape]) : ''}</b> (손톱 영역 ${x.ratio}배 늘림)`;
+    if (k && k.total && (k.bg || k.unchanged))
+      q('why').innerHTML += `<br><span class="warn">손톱 ${k.total}개 중 ${k.bg + k.unchanged}개가 제대로 그려지지 않았을 수 있어요.</span>`;
+    q('dlNail').href = url; q('dlNail').download = `nailshot_hand_${it.no}_${d.hand.replace(/\.[^.]+$/, '')}.jpg`;
+  } else if (ev === 'item_plan') {
+    it.plan = d.plan; q('plan').innerHTML = planHtml(d.plan);
+    if (d.plan.pose_change) q('why').innerHTML += `<br>배너 자세: <b>${esc(d.plan.pose_ko)}</b>`;
+  } else if (ev === 'item_banner') {
+    const { blob, url } = await toBlobUrl(d.image);
+    it.banner = { blob, url, w: d.width, h: d.height, ext: blob.type === 'image/png' ? 'png' : 'jpg' };
+    paneImage(q('bannerPane'), url, { tag: `${it.sceneOnly ? '완성 사진' : '배너'} ${d.width}×${d.height}`, onclick: () => openViewer(it.no - 1, 'banner') });
+    setStep(it, 'banner', 'done'); it.el.querySelectorAll('.steps div').forEach(x => { x.classList.remove('run'); x.classList.add('done'); });
+    q('status').textContent = `완성 · ${it.sceneOnly ? '장면 사진' : '배너'} ${(d.ms / 1000).toFixed(1)}초`;
+    if (!it.nail) q('dlNail').hidden = true;
+    if (it.sceneOnly) q('dl').textContent = '완성 사진 다운로드';
+    if (d.item_usd != null) q('cost').textContent = `이 ${it.sceneOnly ? '사진' : '배너'} 비용\n${money(d.item_usd, KRW ? d.item_usd * KRW : null)}`;
+    q('foot').hidden = false;
+    q('dl').href = url; q('dl').download = bannerName(it);
+    updateProgress();
+  } else if (ev === 'item_error') {
+    it.error = d;
+    const cur = it.el.querySelector('.steps .run');
+    if (cur) { cur.classList.remove('run'); cur.classList.add('fail'); }
+    q('status').textContent = '실패';
+    q('err').hidden = false; q('err').textContent = d.message;
+    it.el.querySelectorAll('.pane .spin').forEach(s => s.parentElement.innerHTML = '<div class="ph">-</div>');
+    if (it.nail) { q('foot').hidden = false; q('zoom').hidden = true; q('dl').hidden = true; }   // 손 사진은 받을 수 있게
+    updateProgress();
+  }
+}
+const bannerName = it => `nailshot_${it.sceneOnly ? 'scene' : 'banner'}_${it.no}.${it.banner.ext}`;
+
+async function run() {
+  if (busy || !files.length) return;
+  busy = true; setErr(''); renderUploads();
+  items.forEach(it => { it.nail && URL.revokeObjectURL(it.nail.url); it.banner && URL.revokeObjectURL(it.banner.url); });
+  const box = $('items'); box.innerHTML = ''; $('empty').hidden = true;
+  const scene = effMode() === 'scene', sceneOnly = scene && !effSceneBanner();
+  if (splitOn()) {      // 세트 목록이 오면 카드를 만들어요
+    items = [];
+    box.innerHTML = '<div class="empty"><div class="spin"></div>사진에서 네일 팁 세트를 찾는 중이에요...</div>';
+  } else {
+    items = files.map((f, i) => ({ no: i + 1, thumb: f.url, scene, sceneOnly }));
+    items.forEach(it => box.appendChild(itemCard(it)));
+  }
+  updateProgress();
+  const fd = new FormData();
+  files.forEach(f => fd.append('designs', f.file));
+  fd.append('quality', document.querySelector('input[name=quality]:checked').value);
+  fd.append('brand', '');
+  fd.append('desc', $('desc').value.trim());
+  fd.append('analysis_effort', $('effA').value);
+  fd.append('plan_effort', $('effP').value);
+  fd.append('nail_length', $('nailLength').value);
+  fd.append('nail_shape', $('nailShape').value);
+  fd.append('pose', $('pose').value);
+  fd.append('apply_mode', 'scene');
+  fd.append('scene_banner', 'off');
+  fd.append('split_sets', splitOn() ? 'on' : 'off');
+  try {
+    const r = await fetch('/api/banner_stream', { method: 'POST', body: fd });
+    if (!r.ok) { let m = '만들기에 실패했어요.'; try { m = (await r.json()).detail || m; } catch (_) {} throw new Error(m); }
+    await readEvents(r, onEvent);
+    items.forEach(it => { if (!it.banner && !it.error) onEvent('item_error', { item: it.no - 1, message: '서버와 연결이 끊겼어요. 다시 시도해 주세요.' }); });
+  } catch (e) {
+    setErr(e.message || '서버와 연결이 끊겼어요.');
+    if (!ready().length) { box.innerHTML = ''; $('empty').hidden = false; items = []; }
+  } finally {
+    busy = false; renderUploads(); updateProgress();
+  }
+}
+$('go').onclick = run;
+$('viewAll').onclick = () => openViewer(0, 'banner');
+
+// ---------------- ZIP (압축 없이 묶기, 라이브러리 없이) ----------------
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function makeZip(entries) {
+  const parts = [], central = []; let offset = 0;
+  const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+    date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  for (const { name, blob } of entries) {
+    const data = new Uint8Array(await blob.arrayBuffer()), nm = new TextEncoder().encode(name), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, time, 2], [12, date, 2], [14, crc, 4], [18, data.length, 4], [22, data.length, 4], [26, nm.length, 2], [28, 0, 2]]
+      .forEach(([o, v, s]) => s === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true));
+    const c = new DataView(new ArrayBuffer(46));
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, time, 2], [14, date, 2], [16, crc, 4], [20, data.length, 4], [24, data.length, 4], [28, nm.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, offset, 4]]
+      .forEach(([o, v, s]) => s === 4 ? c.setUint32(o, v, true) : c.setUint16(o, v, true));
+    parts.push(h, nm, data); central.push(c, nm);
+    offset += 30 + nm.length + data.length;
+  }
+  const size = central.reduce((s, p) => s + p.byteLength, 0), e = new DataView(new ArrayBuffer(22));
+  [[0, 0x06054b50, 4], [4, 0, 2], [6, 0, 2], [8, entries.length, 2], [10, entries.length, 2], [12, size, 4], [16, offset, 4], [20, 0, 2]]
+    .forEach(([o, v, s]) => s === 4 ? e.setUint32(o, v, true) : e.setUint16(o, v, true));
+  return new Blob([...parts, ...central, e], { type: 'application/zip' });
+}
+function saveBlob(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+$('zipAll').onclick = async () => {
+  const list = ready(); if (!list.length) return;
+  const entries = [];
+  for (const it of items) {      // 세트 나누기: 잘라낸 세트 사진도 각각 (실패한 세트 포함)
+    if (it.setCrop) entries.push({ name: `sets/nailshot_set_${it.no}.jpg`, blob: await (await fetch(it.setCrop)).blob() });
+  }
+  list.forEach(it => {
+    entries.push({ name: bannerName(it), blob: it.banner.blob });
+    if (it.nail) entries.push({ name: `hands/nailshot_hand_${it.no}.jpg`, blob: it.nail.blob });
+    if (it.plan) entries.push({ name: `plans/nailshot_plan_${it.no}.json`, blob: new Blob([JSON.stringify(it.plan, null, 2)], { type: 'application/json' }) });
+  });
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  saveBlob(await makeZip(entries), `nailshot_scenes_${stamp}.zip`);
+};
+
+// ---------------- 미리보기: 여러 장 차례로 + 확대/축소/이동 ----------------
+const lb = $('lb'), view = $('lbView'), lbImg = $('lbImg');
+const V = { s: 1, x: 0, y: 0, fit: 1, w: 0, h: 0 };
+const L = { list: [], pos: 0, mode: 'banner' };
+const pointers = new Map();
+let pinch = null, lastTap = 0, lastFocus = null, swipe = null;
+
+function apply() { lbImg.style.transform = `translate(${V.x}px, ${V.y}px) scale(${V.s})`; $('lbPct').textContent = Math.round(V.s * 100) + '%'; }
+function clampPan() {
+  const vw = view.clientWidth, vh = view.clientHeight, iw = V.w * V.s, ih = V.h * V.s;
+  V.x = iw <= vw ? (vw - iw) / 2 : Math.min(0, Math.max(vw - iw, V.x));
+  V.y = ih <= vh ? (vh - ih) / 2 : Math.min(0, Math.max(vh - ih, V.y));
+}
+function calcFit() { return Math.min(view.clientWidth / V.w, view.clientHeight / V.h, 1) * 0.94; }
+function fitView() { V.fit = calcFit(); V.s = V.fit; clampPan(); apply(); }
+function zoomAt(f, cx, cy) {
+  const ns = Math.min(Math.max(V.s * f, V.fit * 0.5), Math.max(8, V.fit * 8));
+  V.x = cx - (cx - V.x) * (ns / V.s); V.y = cy - (cy - V.y) * (ns / V.s); V.s = ns;
+  clampPan(); apply();
+}
+const zoomCenter = f => zoomAt(f, view.clientWidth / 2, view.clientHeight / 2);
+const cur = () => L.list[L.pos];
+const curImg = it => (L.mode === 'nail' && it.nail) ? it.nail : it.banner;
+
+function show(pos) {
+  if (!L.list.length) return;
+  L.pos = (pos + L.list.length) % L.list.length;
+  const it = cur(), im = curImg(it);
+  const keep = $('lbKeep').checked && V.w && im.w === V.w && im.h === V.h && V.s > 0;
+  const prev = { s: V.s, x: V.x, y: V.y };
+  lbImg.onload = () => {
+    V.w = lbImg.naturalWidth; V.h = lbImg.naturalHeight; V.fit = calcFit();
+    if (keep) { Object.assign(V, prev); clampPan(); apply(); } else fitView();
+  };
+  lbImg.src = im.url;
+  if (lbImg.complete && lbImg.naturalWidth && lbImg.src === im.url) lbImg.onload();
+  const isNail = L.mode === 'nail' && it.nail;
+  $('lbTitle').innerHTML = `<b>${L.pos + 1} / ${L.list.length}</b>${it.no}번 ${isNail ? '네일 손 사진' : '배너'}`
+    + (it.plan ? ` <small>· ${esc(it.plan.concept_ko)}</small>` : '') + ` <small>· ${im.w}×${im.h}</small>`;
+  const one = L.list.length < 2;
+  $('lbPrev').disabled = one; $('lbNext').disabled = one;
+  $('lbStrip').querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i === L.pos));
+  $('lbStrip').children[L.pos]?.scrollIntoView({ block: 'nearest', inline: 'center' });
+}
+function setMode(m) {
+  L.mode = m;
+  $('lbMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  buildStrip(); show(L.pos);
+}
+function buildStrip() {
+  const s = $('lbStrip'); s.innerHTML = '';
+  L.list.forEach((it, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.title = `${it.no}번`;
+    b.innerHTML = `<img src="${curImg(it).url}" alt=""><span>${it.no}</span>`;
+    b.onclick = () => show(i);
+    s.appendChild(b);
+  });
+  s.hidden = L.list.length < 2;
+}
+function openViewer(itemIndex, mode) {
+  L.list = ready(); if (!L.list.length) return;
+  lastFocus = document.activeElement;
+  const p = L.list.findIndex(it => it.no - 1 === itemIndex);
+  L.mode = mode || 'banner';
+  $('lbMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === L.mode));
+  lb.hidden = false; document.body.classList.add('lb-open');
+  V.w = 0; buildStrip(); show(p < 0 ? 0 : p);
+  $('lbClose').focus();
+}
+function closeViewer() { lb.hidden = true; document.body.classList.remove('lb-open'); pointers.clear(); pinch = null; lastFocus?.focus?.(); }
+$('lbClose').onclick = closeViewer;
+$('lbPrev').onclick = () => show(L.pos - 1);
+$('lbNext').onclick = () => show(L.pos + 1);
+$('lbIn').onclick = () => zoomCenter(1.4);
+$('lbOut').onclick = () => zoomCenter(1 / 1.4);
+$('lbFit').onclick = fitView;
+$('lb100').onclick = () => zoomCenter(1 / V.s);
+$('lbMode').onclick = e => { const m = e.target.dataset?.mode; if (m && m !== L.mode) setMode(m); };
+$('lbDl').onclick = () => { const it = cur(); if (!it) return; const nail = L.mode === 'nail' && it.nail;
+  saveBlob(nail ? it.nail.blob : it.banner.blob, nail ? `nailshot_hand_${it.no}.jpg` : bannerName(it)); };
+['lbPrev', 'lbNext'].forEach(id => $(id).addEventListener('pointerdown', e => e.stopPropagation()));
+window.addEventListener('keydown', e => {
+  if (lb.hidden) return;
+  if (e.key === 'Escape') closeViewer();
+  else if (e.key === 'ArrowLeft') show(L.pos - 1);
+  else if (e.key === 'ArrowRight') show(L.pos + 1);
+  else if (e.key === '+' || e.key === '=') zoomCenter(1.25);
+  else if (e.key === '-') zoomCenter(1 / 1.25);
+  else if (e.key === '0') fitView();
+  else if (e.key === '1') zoomCenter(1 / V.s);
+  else return;
+  e.preventDefault();
+});
+window.addEventListener('resize', () => { if (!lb.hidden && V.w) { const zoomed = V.s > V.fit * 1.01; V.fit = calcFit(); if (zoomed) { clampPan(); apply(); } else fitView(); } });
+view.addEventListener('wheel', e => { e.preventDefault(); const r = view.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+view.addEventListener('pointerdown', e => {
+  view.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  view.classList.add('drag');
+  if (pointers.size === 1) swipe = { x: e.clientX, y: e.clientY, fit: V.s <= V.fit * 1.01 }; else swipe = null;
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; }
+  const now = Date.now();
+  if (pointers.size === 1 && now - lastTap < 300) {
+    const r = view.getBoundingClientRect();
+    if (V.s > V.fit * 1.3) fitView(); else zoomAt((V.fit * 2.5) / V.s, e.clientX - r.left, e.clientY - r.top);
+    lastTap = 0; swipe = null;
+  } else lastTap = now;
+});
+view.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const r = view.getBoundingClientRect();
+  if (pointers.size === 2 && pinch) {
+    const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+    zoomAt(d / pinch.d, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top); pinch.d = d;
+  } else if (pointers.size === 1 && !(swipe && swipe.fit)) {
+    V.x += e.clientX - prev.x; V.y += e.clientY - prev.y; clampPan(); apply();
+  }
+});
+const endPointer = e => {
+  if (swipe && swipe.fit && pointers.size === 1 && e.type === 'pointerup') {      // 맞춤 상태에서 옆으로 밀기 = 넘기기
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) show(L.pos + (dx < 0 ? 1 : -1));
+  }
+  swipe = null;
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (!pointers.size) view.classList.remove('drag');
+};
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => view.addEventListener(ev, endPointer));
+</script>
+</body>
+</html>
