@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이달의 아트 · 모델 실험실</title>
+<link rel="stylesheet" href="styles.css">
+<script src="model-client.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="site-header">
+  <div><h1>이달의 아트</h1><span>모델 실험실</span></div>
+  <div class="header-actions"><button type="button" id="import-record">실험 기록 불러오기</button><input type="file" id="record-file" accept=".json,application/json" hidden></div>
+</header>
+<main>
+  <section class="workspace" aria-labelledby="workspace-title">
+    <div class="section-heading"><h2 id="workspace-title">생성 실험</h2><p>같은 입력으로 이미지와 글을 따로 또는 함께 생성해 보세요.</p></div>
+    <div class="tabs" role="tablist" aria-label="생성 유형">
+      <button type="button" role="tab" id="tab-image" aria-controls="results" aria-selected="true" data-mode="image">이미지 생성</button>
+      <button type="button" role="tab" id="tab-text" aria-controls="results" aria-selected="false" tabindex="-1" data-mode="text">글 생성</button>
+      <button type="button" role="tab" id="tab-both" aria-controls="results" aria-selected="false" tabindex="-1" data-mode="both">한 번에 생성</button>
+    </div>
+    <form id="experiment" novalidate>
+      <p id="import-status" role="status" hidden></p>
+      <div class="form-heading"><h3>매장 정보</h3><span>모든 입력은 선택입니다.</span></div>
+      <div class="fields">
+        <div class="clearable"><label for="field-shop">매장명</label><input id="field-shop" name="shop" placeholder="예: 오라네일" autocomplete="off"><button type="button" class="clear-field" data-clear="shop" aria-label="매장명 지우기" hidden>×</button></div>
+        <div class="clearable"><label for="field-instagramId">인스타그램 아이디</label><input id="field-instagramId" name="instagramId" placeholder="예: @ora_nail" autocomplete="off"><button type="button" class="clear-field" data-clear="instagramId" aria-label="인스타그램 아이디 지우기" hidden>×</button></div>
+        <div class="clearable"><label for="field-businessHours">영업시간</label><input id="field-businessHours" name="businessHours" placeholder="예: 평일 11:00–20:00"><button type="button" class="clear-field" data-clear="businessHours" aria-label="영업시간 지우기" hidden>×</button></div>
+        <div class="clearable"><label for="field-booking">예약 링크</label><input id="field-booking" name="booking" inputmode="url" placeholder="https://"><button type="button" class="clear-field" data-clear="booking" aria-label="예약 링크 지우기" hidden>×</button></div>
+      </div>
+      <div class="clearable prompt"><label for="field-prompt">프롬프트</label><textarea id="field-prompt" name="prompt" rows="5" placeholder="원하는 분위기, 디자인별 가격, 결과 형식을 자유롭게 적어 주세요."></textarea><button type="button" class="clear-field" data-clear="prompt" aria-label="프롬프트 지우기" hidden>×</button></div>
+      <div id="drop-zone" class="drop-zone">
+        <p>네일 사진을 여기에 끌어다 놓으세요.</p>
+        <button type="button" id="attach">＋ 사진 첨부</button>
+        <input type="file" id="images" accept="image/*" multiple hidden>
+      </div>
+      <div id="attachments" class="attachments" aria-label="첨부 사진"></div>
+      <p id="attachment-status" role="status"></p>
+      <div class="form-actions"><div class="form-tools"><button type="button" id="sample">예시 입력</button><button type="reset">전체 초기화</button></div><button class="primary" id="generate">이미지 생성하기</button></div>
+    </form>
+  </section>
+  <section class="results" id="results" role="tabpanel" aria-labelledby="tab-image" tabindex="0">
+    <div class="section-heading result-heading"><div><h2>실험 결과</h2><p id="result-kind">네일 팁 가격표와 착용컷</p></div><div class="result-tools"><span id="connection"></span><button type="button" id="clear-results">결과 초기화</button></div></div>
+    <p id="empty">생성 버튼을 누르면 여기에 결과가 표시됩니다.</p>
+    <div id="runs"></div>
+  </section>
+</main>
+<template id="run-template">
+  <article class="run">
+    <div class="run-heading"><h3></h3><span class="run-status" role="status"></span></div>
+    <div class="run-actions"><button type="button" class="download-run" hidden>실험 기록 다운로드</button><button type="button" class="delete-run">삭제</button></div>
+    <p class="download-status" role="status"></p>
+    <div class="output"></div>
+    <details><summary>요청 입력 보기</summary><dl></dl></details>
+  </article>
+</template>
+</body>
+</html>
