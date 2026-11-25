@@ -52,7 +52,7 @@ curl -X POST http://127.0.0.1:8004/generate \
 | 필드 | 규칙 |
 |---|---|
 | `images` | 정확히 1장, PNG 또는 JPG, 10MB 이하 |
-| `prompt` | 비어 있으면 안 됨, 200자 이하 |
+| `prompt` | 앞뒤 공백을 뺀 뒤 1~200자 |
 | `shop`, `instagramId`, `businessHours`, `booking` | 받기만 하고 목업에서는 쓰지 않습니다. 형식 검사는 웹 백엔드가 합니다 |
 
 - 받은 사진은 검사와 생성에만 쓰고 **저장하지 않습니다.**

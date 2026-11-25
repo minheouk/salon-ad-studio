@@ -53,6 +53,11 @@ def test_prompt_limit_is_200_chars():
     assert error_code(lambda: check_prompt("가" * 201)) == "PROMPT_TOO_LONG"
 
 
+def test_prompt_length_is_checked_after_trimming_spaces():
+    assert check_prompt("  " + "가" * 200 + " \t") == "가" * 200
+    assert error_code(lambda: check_prompt(" " + "가" * 201 + " ")) == "PROMPT_TOO_LONG"
+
+
 @pytest.mark.parametrize("count", [0, 2])
 def test_exactly_one_photo_is_accepted(count):
     photos = [make_png(600, 600)] * count

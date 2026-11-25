@@ -42,13 +42,15 @@ class Photo:
 
 
 def check_prompt(prompt: object) -> str:
-    if not isinstance(prompt, str) or not prompt.strip():
+    """API 명세대로 앞뒤 공백을 뺀 값으로 비었는지와 길이를 검사한다."""
+    text = prompt.strip() if isinstance(prompt, str) else ""
+    if not text:
         raise ApiError("EMPTY_PROMPT", "요청 내용을 입력해 주세요.")
-    if len(prompt) > MAX_PROMPT_CHARS:
+    if len(text) > MAX_PROMPT_CHARS:
         raise ApiError(
             "PROMPT_TOO_LONG", f"요청 내용은 {MAX_PROMPT_CHARS}자 이하로 입력해 주세요."
         )
-    return prompt.strip()
+    return text
 
 
 def check_photos(photos: list[bytes]) -> list[Photo]:

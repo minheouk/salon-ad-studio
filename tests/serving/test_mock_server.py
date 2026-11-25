@@ -97,6 +97,11 @@ def test_invalid_input_is_rejected_with_400(api, prompt, images, code):
     assert (status, body["code"]) == (400, code)
 
 
+@pytest.mark.parametrize("path", ["/generate", "/copy"])
+def test_200_char_prompt_with_trailing_space_is_accepted(api, path):
+    assert generate(api, "가" * 200 + " ", path=path)[0] == 200
+
+
 def test_copy_returns_caption_and_hashtags_in_the_same_response(api):
     status, _, body = generate(api, path="/copy")
     assert status == 200
