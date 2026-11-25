@@ -7,6 +7,10 @@
 # 문서: 팀원 누구나 (PM의 문서 작업을 다른 팀원이 승인할 수 있도록)
 /docs/                    @minheouk @mitguchin @SeoJungCheol @aiengineeung-del @dypower1559-cell @diokim17
 
+# 회의록: 담당자 없음. 회의록만 바꾼 PR은 GitHub Actions가 자동 승인합니다.
+# (.github/workflows/meeting-notes-auto-approve.yml)
+/docs/meetings/
+
 # 역할별 폴더
 /src/pipelines/model/     @mitguchin @SeoJungCheol
 /tests/model/             @mitguchin @SeoJungCheol
