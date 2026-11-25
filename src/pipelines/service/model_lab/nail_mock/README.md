@@ -4,13 +4,13 @@
 
 ## 실행 및 전달
 
-저장소 루트에서 아래 명령을 실행합니다. 실험 페이지는 `src/pipelines/service/nail-post-wireframe/model-lab/index.html`에 있고, 상위 폴더의 예시 이미지 두 장을 상대 경로로 참조합니다. 파일을 직접 열어 목업을 볼 수도 있습니다. API 연동과 결과 이미지 파일을 포함한 다운로드는 HTTP로 실행해 확인합니다.
+저장소 루트에서 아래 명령을 실행합니다. 실험 페이지는 `src/pipelines/service/model_lab/nail_mock/index.html`에 있고, `assets/`의 예시 이미지 두 장을 상대 경로로 참조합니다. 파일을 직접 열어 목업을 볼 수도 있습니다. API 연동과 결과 이미지 파일을 포함한 다운로드는 HTTP로 실행해 확인합니다.
 
 ```sh
-python3 -m http.server 8765 --bind 127.0.0.1 --directory src/pipelines/service
+python3 -m http.server 8765 --bind 127.0.0.1 --directory src/pipelines/service/model_lab
 ```
 
-브라우저에서 `http://127.0.0.1:8765/nail-post-wireframe/model-lab/`을 엽니다.
+브라우저에서 `http://127.0.0.1:8765/nail_mock/`을 엽니다.
 
 ## 목업으로 실험하는 방법
 

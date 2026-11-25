@@ -8,10 +8,12 @@
 
 ```sh
 git fetch origin
-git restore --source=origin/feat/service-model-lab -- src/pipelines/service/model_lab/ src/pipelines/service/shared/model-lab-files.js
+git restore --source=origin/feat/service-model-lab -- src/pipelines/service/model_lab/
 ```
 
 현재 브랜치에서 목업 폴더만 작업 트리에 가져옵니다. 가져온 뒤 아래 실행 절차를 따르면 됩니다. 목업 브랜치를 체크아웃하고 있다면 바로 실행 절차로 넘어가면 됩니다.
+
+정적 네일 목업의 실행 방법과 글 생성·실험 기록 기능은 [네일 모델 실험실 안내](nail_mock/README.md)에서 확인할 수 있습니다.
 
 ## 실행하기
 

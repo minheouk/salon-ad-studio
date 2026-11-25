@@ -9,8 +9,8 @@ async function requestGeneration(mode, input, images) {
   if (!endpoint) {
     if (mode === 'image') {
       return {images: [
-        {url: '../winter-nail-tips.png', label: '네일 팁 · 원본 예시'},
-        {url: '../collage-example.png', label: '착용컷 콜라주 · 결과 예시'},
+        {url: './assets/winter-nail-tips.png', label: '네일 팁 · 원본 예시'},
+        {url: './assets/collage-example.png', label: '착용컷 콜라주 · 결과 예시'},
       ]};
     }
     return {
