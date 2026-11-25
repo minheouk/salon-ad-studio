@@ -109,8 +109,15 @@ Review and merge:
 | Model or serving work | The other member of the same role | The author |
 | Service work | PM | The author |
 | PM's `docs/` work | Any teammate | PM |
+| Meeting notes only: every change is an added or modified `docs/meetings/*.md` | GitHub Actions, automatically | The author |
 | "PM 확인 필요" checked (shared files, another role's folder, GPU or disk impact) | PM | PM |
 | `dev` into `main` | — | PM only |
+
+Meeting notes:
+
+- The team reviews meeting notes in Discord before the pull request. Write "디스코드 검수 완료" in the pull request.
+- Keep a meeting-notes pull request to meeting notes alone. Any other file, or deleting or moving a note,
+  removes the automatic approval and the pull request follows the normal review rules.
 
 ## 5. Commits
 

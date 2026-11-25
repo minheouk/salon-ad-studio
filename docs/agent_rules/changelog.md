@@ -6,3 +6,4 @@ merge된 뒤에는 각자 로컬 `AGENTS.md` / `CLAUDE.md`에 같은 내용을 �
 | 날짜 | 바뀐 내용 | 해당 절 | 작성자 | PR |
 |---|---|---|---|---|
 | 2026-11-19 | `AGENTS.md`, `CLAUDE.md`를 각자 로컬에서 관리하도록 바꾸고, 공통 규칙을 `base_rules.md`로 옮김 | 전체 | 김민혁 | #1 |
+| 2026-11-25 | 회의록(`docs/meetings/*.md`)만 바꾼 PR은 GitHub Actions가 자동 승인하고 작성자가 merge | 4 | 김민혁 | #7 |

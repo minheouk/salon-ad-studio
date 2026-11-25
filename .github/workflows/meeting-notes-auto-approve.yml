@@ -1,0 +1,61 @@
+# 회의록 PR 자동 승인
+#
+# dev로 가는 PR의 변경이 전부 docs/meetings/ 바로 아래의 .md 파일 추가·수정이면 자동으로 승인합니다.
+# 다른 파일이 하나라도 섞이거나, 회의록을 지우거나 옮기면 승인하지 않고, 이미 한 자동 승인도 취소합니다.
+#
+# pull_request_target을 쓰는 이유: 이 파일은 PR 브랜치가 아니라 dev에 있는 버전으로 실행됩니다.
+# 그래서 PR 안에서 이 파일을 고쳐 검사를 우회할 수 없습니다. PR의 코드는 내려받거나 실행하지 않습니다.
+
+name: 회의록 자동 승인
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  approve:
+    # 이 레포 안의 브랜치에서 올린 PR만 대상입니다. (fork에서 온 PR 제외)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: 변경 파일을 검사하고 승인 또는 승인 취소
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # 회의록 추가·수정이 아닌 변경 목록
+          not_allowed=$(gh api --paginate "repos/$REPO/pulls/$PR/files" \
+            --jq '.[] | select((.status != "added" and .status != "modified")
+                               or (.filename | test("^docs/meetings/[^/]+[.]md$") | not))
+                      | "\(.status) \(.filename)"')
+
+          if [ -z "$not_allowed" ]; then
+            gh api -X POST "repos/$REPO/pulls/$PR/reviews" \
+              -f event=APPROVE \
+              -f commit_id="$HEAD_SHA" \
+              -f body="회의록(docs/meetings/*.md)만 바꾼 PR이라 자동으로 승인했습니다." > /dev/null
+            echo "자동 승인했습니다."
+            exit 0
+          fi
+
+          echo "회의록 외의 변경이 있어 자동 승인 대상이 아닙니다:"
+          echo "$not_allowed"
+
+          # 앞서 자동 승인한 적이 있으면 취소합니다.
+          approvals=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and .state == "APPROVED") | .id')
+          for id in $approvals; do
+            gh api -X PUT "repos/$REPO/pulls/$PR/reviews/$id/dismissals" \
+              -f event=DISMISS \
+              -f message="회의록 외의 파일이 추가되어 자동 승인을 취소했습니다. 일반 리뷰 규칙을 따라 주세요." > /dev/null
+            echo "자동 승인 $id 을(를) 취소했습니다."
+          done
