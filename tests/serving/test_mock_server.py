@@ -65,18 +65,17 @@ def request(url: str, data: bytes | None = None, headers: dict | None = None):
         return error.code, error.headers, error.read()
 
 
-def generate(api: str, prompt: str = PROMPT, images: list[bytes] | None = None):
+def generate(api: str, prompt: str = PROMPT, images: list[bytes] | None = None, path: str = "/generate"):
     images = [make_png(1024, 1024)] if images is None else images
     body, content_type = encode_form({**STORE_FIELDS, "prompt": prompt}, images)
-    status, headers, raw = request(f"{api}/generate", body, {"Content-Type": content_type})
+    status, headers, raw = request(api + path, body, {"Content-Type": content_type})
     return status, headers, json.loads(raw)
 
 
-def test_generate_returns_five_downloadable_results_in_the_same_response(api):
-    status, _, body = generate(api, images=[make_png(1024, 1024), make_jpeg(4032, 3024)])
+def test_generate_returns_price_table_first_then_nail_tips(api):
+    status, _, body = generate(api, images=[make_jpeg(4032, 3024)])
     assert status == 200
-    assert len(body["results"]) == 5
-    assert body["results"][0]["copy"] == "[목업] 광고 문구 1"
+    assert [result["type"] for result in body["results"]] == ["price_table"] + ["nail_tip"] * 12
     assert set(body["timing_ms"]) == {"wait", "run", "total"}
 
     status, headers, png = request(api + body["results"][0]["url"])
@@ -89,6 +88,7 @@ def test_generate_returns_five_downloadable_results_in_the_same_response(api):
     [
         ("", None, "EMPTY_PROMPT"),
         (PROMPT, [], "PHOTO_COUNT"),
+        (PROMPT, [make_png(1024, 1024)] * 2, "PHOTO_COUNT"),
         (PROMPT, [b"GIF89a"], "UNSUPPORTED_FORMAT"),
     ],
 )
@@ -97,13 +97,23 @@ def test_invalid_input_is_rejected_with_400(api, prompt, images, code):
     assert (status, body["code"]) == (400, code)
 
 
+def test_copy_returns_caption_and_hashtags_in_the_same_response(api):
+    status, _, body = generate(api, path="/copy")
+    assert status == 200
+    assert set(body) == {"timing_ms", "caption", "hashtags"}
+
+
 @pytest.mark.parametrize(
-    ("marker", "status", "code"),
-    [("[mock:failed]", 502, "GENERATION_FAILED"), ("[mock:timeout]", 504, "TIMEOUT")],
+    ("path", "marker", "status", "body"),
+    [
+        ("/generate", "[mock:failed]", 502, {"code": "GENERATION_FAILED", "message": "광고를 만들지 못했습니다. 다시 시도해 주세요."}),
+        ("/copy", "[mock:failed]", 502, {"code": "GENERATION_FAILED", "message": "광고 문구를 만들지 못했습니다. 다시 시도해 주세요."}),
+        ("/generate", "[mock:timeout]", 504, {"code": "TIMEOUT", "message": "처리 시간이 60초를 넘었습니다. 다시 시도해 주세요."}),
+    ],
 )
-def test_prompt_marker_forces_failure(api, marker, status, code):
-    result = generate(api, f"{PROMPT} {marker}")
-    assert (result[0], result[2]["code"]) == (status, code)
+def test_prompt_marker_forces_failure(api, path, marker, status, body):
+    result = generate(api, f"{PROMPT} {marker}", path=path)
+    assert (result[0], result[2]) == (status, body)
 
 
 def test_generation_over_the_server_limit_times_out(api, monkeypatch):

@@ -48,13 +48,13 @@ def test_empty_prompt_is_rejected(prompt):
     assert error_code(lambda: check_prompt(prompt)) == "EMPTY_PROMPT"
 
 
-def test_prompt_limit_is_100_chars():
-    assert check_prompt("가" * 100) == "가" * 100
-    assert error_code(lambda: check_prompt("가" * 101)) == "PROMPT_TOO_LONG"
+def test_prompt_limit_is_200_chars():
+    assert check_prompt("가" * 200) == "가" * 200
+    assert error_code(lambda: check_prompt("가" * 201)) == "PROMPT_TOO_LONG"
 
 
-@pytest.mark.parametrize("count", [0, 6])
-def test_photo_count_must_be_1_to_5(count):
+@pytest.mark.parametrize("count", [0, 2])
+def test_exactly_one_photo_is_accepted(count):
     photos = [make_png(600, 600)] * count
     assert error_code(lambda: check_photos(photos)) == "PHOTO_COUNT"
 

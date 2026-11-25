@@ -8,9 +8,10 @@ import struct
 import zlib
 from dataclasses import dataclass
 
-MAX_PHOTOS = 5
+# 웹은 네일 팁 세트 사진 1장을 보낸다.
+MAX_PHOTOS = 1
 MAX_FILE_BYTES = 10 * 1024 * 1024
-MAX_PROMPT_CHARS = 100
+MAX_PROMPT_CHARS = 200
 # 짧은 변이 512px보다 작으면 광고 이미지로 쓰기에 화질이 부족하다.
 MIN_SIDE = 512
 # 48MP 이상 원본처럼 긴 변이 8192px을 넘는 사진은 받지 않는다. 일반 휴대폰 사진(12MP, 4032px)은 통과한다.
@@ -51,8 +52,8 @@ def check_prompt(prompt: object) -> str:
 
 
 def check_photos(photos: list[bytes]) -> list[Photo]:
-    if not 1 <= len(photos) <= MAX_PHOTOS:
-        raise ApiError("PHOTO_COUNT", f"사진은 1장에서 {MAX_PHOTOS}장까지 올릴 수 있습니다.")
+    if len(photos) != MAX_PHOTOS:
+        raise ApiError("PHOTO_COUNT", f"사진은 {MAX_PHOTOS}장만 올릴 수 있습니다.")
     return [check_photo(photo, number) for number, photo in enumerate(photos, start=1)]
 
 

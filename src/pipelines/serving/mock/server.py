@@ -29,7 +29,8 @@ from src.pipelines.serving.mock.validation import (
 
 # 외부에 포트를 열지 않는다. VM에서는 SSH 포트 전달로만 접속한다.
 HOST = "127.0.0.1"
-GENERATE_PATH = "/generate"
+# 주소 -> 생성 종류. 두 주소 모두 요청 필드와 입력 검증이 같다.
+GENERATE_ROUTES = {"/generate": generation.IMAGES, "/copy": generation.COPY}
 # 사진 최대 장수 × 최대 크기에, 텍스트 필드와 multipart 경계 문자열 몫으로 1MB를 더한다.
 MAX_BODY_BYTES = MAX_PHOTOS * MAX_FILE_BYTES + 1024 * 1024
 QUEUE_FULL_RETRY_AFTER_SECONDS = 10
@@ -68,15 +69,18 @@ def ms_between(start: float, end: float) -> int:
 
 
 def generation_view(done: generation.Generation) -> dict:
+    timing = {
+        "wait": ms_between(done.received_at, done.started_at),
+        "run": ms_between(done.started_at, done.finished_at),
+        "total": ms_between(done.received_at, done.finished_at),
+    }
+    if done.copy is not None:
+        return {"timing_ms": timing, **done.copy}
     return {
         "generation_id": done.id,
-        "timing_ms": {
-            "wait": ms_between(done.received_at, done.started_at),
-            "run": ms_between(done.started_at, done.finished_at),
-            "total": ms_between(done.received_at, done.finished_at),
-        },
+        "timing_ms": timing,
         "results": [
-            {"url": signed_url(f"/api/results/{done.id}/{number}"), "copy": result["copy"]}
+            {"type": result["type"], "url": signed_url(f"/api/results/{done.id}/{number}")}
             for number, result in enumerate(done.results, start=1)
         ],
         "results_expire_in_seconds": round(
@@ -90,9 +94,10 @@ class MockHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         try:
-            if urlsplit(self.path).path != GENERATE_PATH:
+            kind = GENERATE_ROUTES.get(urlsplit(self.path).path)
+            if kind is None:
                 raise ApiError("NOT_FOUND", "없는 주소입니다.", 404)
-            self.send_json(HTTPStatus.OK, generation_view(self.generate()))
+            self.send_json(HTTPStatus.OK, generation_view(self.generate(kind)))
         except ApiError as error:
             self.send_error_json(error)
 
@@ -107,13 +112,13 @@ class MockHandler(BaseHTTPRequestHandler):
         except ApiError as error:
             self.send_error_json(error)
 
-    def generate(self) -> generation.Generation:
+    def generate(self, kind: str) -> generation.Generation:
         fields, images = self.read_form()
         # 처리 시간은 요청 본문을 다 받은 뒤부터 잰다. 업로드 시간은 넣지 않는다.
         received_at = time.monotonic()
         check_photos(images)
         prompt = check_prompt(fields.get("prompt"))
-        return self.generator.generate(mock_outcome(prompt), received_at)
+        return self.generator.generate(kind, mock_outcome(prompt), received_at)
 
     def read_form(self) -> tuple[dict[str, str], list[bytes]]:
         length = int(self.headers.get("Content-Length") or 0)
