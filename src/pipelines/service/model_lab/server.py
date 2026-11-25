@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-FRONTEND = Path(__file__).resolve().parent / "web"
+SERVICE = Path(__file__).resolve().parents[1]
 ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
 API_PATH = "/api/model-lab/generate"
 API_ROOT = "https://api.openai.com/v1/images"
@@ -24,10 +24,11 @@ MAX_IMAGES = 16
 IMAGE_PREFIXES = tuple(f"data:image/{kind};base64," for kind in ("png", "jpeg"))
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 STATIC_FILES = {
-    "/model-lab/": ("index.html", "text/html; charset=utf-8"),
-    "/model-lab/app.js": ("app.js", "text/javascript; charset=utf-8"),
-    "/model-lab/model-client.js": ("model-client.js", "text/javascript; charset=utf-8"),
-    "/model-lab/styles.css": ("styles.css", "text/css; charset=utf-8"),
+    "/shared/model-lab-files.js": ("shared/model-lab-files.js", "text/javascript; charset=utf-8"),
+    "/model-lab/": ("model_lab/web/index.html", "text/html; charset=utf-8"),
+    "/model-lab/app.js": ("model_lab/web/app.js", "text/javascript; charset=utf-8"),
+    "/model-lab/model-client.js": ("model_lab/web/model-client.js", "text/javascript; charset=utf-8"),
+    "/model-lab/styles.css": ("model_lab/web/styles.css", "text/css; charset=utf-8"),
 }
 
 
@@ -123,7 +124,7 @@ class ModelLabHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         filename, content_type = asset
-        self.respond(HTTPStatus.OK, content_type, (FRONTEND / filename).read_bytes())
+        self.respond(HTTPStatus.OK, content_type, (SERVICE / filename).read_bytes())
 
     # 실험 요청의 크기와 형식을 확인합니다.
     def read_inputs(self) -> tuple[str, list[str], str | None]:

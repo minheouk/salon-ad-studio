@@ -2,11 +2,8 @@
 
 // 브라우저의 이미지 파일을 JSON 요청에 담을 수 있는 형태로 변환합니다.
 function imageDataUrl(image) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(reader.result));
-    reader.addEventListener("error", () => reject(new Error("첨부 이미지를 읽지 못했습니다.")));
-    reader.readAsDataURL(image);
+  return globalThis.modelLabFiles.readDataUrl(image).catch(() => {
+    throw new Error("첨부 이미지를 읽지 못했습니다.");
   });
 }
 

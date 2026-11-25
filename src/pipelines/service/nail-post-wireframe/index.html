@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이달의 아트 · 와이어플로우</title>
+<link rel="stylesheet" href="wireflow.css">
+<script src="wireflow.js" defer></script>
+</head>
+<body>
+<header class="toolbar">
+  <h1>이달의 아트 <span>와이어프레임</span></h1>
+  <nav aria-label="보기 방식">
+    <a href="#board" id="board-link">와이어플로우</a>
+    <a href="#input" id="screen-link">한 화면씩 보기</a>
+  </nav>
+</header>
+<main>
+  <section id="board" aria-label="화면 흐름">
+    <div class="controls">
+      <p>네일샵 인스타그램 게시 흐름</p>
+      <div class="zoom"><button id="minus" aria-label="축소">−</button><output id="zoom-level">100%</output><button id="plus" aria-label="확대">+</button><button id="fit">전체 맞춤</button></div>
+    </div>
+    <div class="viewport" id="viewport" tabindex="0" aria-label="화면 연결 캔버스">
+      <div id="bounds"><div id="world">
+        <svg viewBox="0 0 1604 1170" class="connections" aria-hidden="true">
+          <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#7765a3"/></marker></defs>
+          <path d="M274 220H355"/><path d="M599 220H680"/><path d="M924 220H1005"/><path d="M1249 220H1330"/>
+          <text x="314" y="206">초안 만들기</text><text x="639" y="206">다음 이미지</text>
+          <text x="964" y="206">두 장 검토</text><text x="1289" y="206">게시하기</text>
+          <path d="M477 605V665H314V720"/><path d="M477 665H640V720"/>
+          <text class="branch-label" x="373" y="652">이미지 수정</text><text class="branch-label" x="580" y="652">문구 수정</text>
+        </svg>
+        <div id="frames"></div>
+      </div></div>
+    </div>
+  </section>
+  <section id="player" hidden aria-label="한 화면씩 보기">
+    <aside id="index" aria-label="화면 목록"></aside>
+    <div class="stage"><div id="active-frame"></div></div>
+  </section>
+</main>
+</body>
+</html>

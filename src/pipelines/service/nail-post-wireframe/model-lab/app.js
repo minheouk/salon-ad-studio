@@ -12,6 +12,7 @@ const pending = {image: false, text: false, both: false};
 const runCounts = {image: 0, text: 0, both: 0};
 const clearResults = document.querySelector('#clear-results');
 const files = [];
+const imageTypes = new Set(['image/jpeg', 'image/png']);
 const fieldLabels = {
   shop: '매장명', instagramId: '인스타그램 아이디', businessHours: '영업시간',
   booking: '예약 링크', prompt: '프롬프트', images: '사진',
@@ -40,36 +41,23 @@ function showMode() {
 }
 
 function showAttachments() {
-  attachmentList.replaceChildren(...files.map((entry, index) => {
-    const item = document.createElement('div');
-    item.className = 'attachment';
-    const image = new Image();
-    image.src = entry.url;
-    image.alt = entry.file.name;
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', entry.file.name + ' 제거');
-    remove.addEventListener('click', () => {
-      URL.revokeObjectURL(entry.url);
-      files.splice(index, 1);
-      showAttachments();
-    });
-    item.append(image, remove);
-    return item;
-  }));
+  globalThis.modelLabFiles.renderAttachments(attachmentList, files, (entry, index) => {
+    URL.revokeObjectURL(entry.url);
+    files.splice(index, 1);
+    showAttachments();
+  });
 }
 
 function addFiles(items) {
   let skipped = false;
   for (const file of items) {
-    if (!file.type.startsWith('image/')) {
+    if (!imageTypes.has(file.type)) {
       skipped = true;
       continue;
     }
     files.push({file, url: URL.createObjectURL(file)});
   }
-  attachmentStatus.textContent = skipped ? '이미지 파일만 첨부했습니다.' : '';
+  attachmentStatus.textContent = skipped ? 'JPG와 PNG 파일만 첨부할 수 있습니다.' : '';
   showAttachments();
 }
 
@@ -99,15 +87,6 @@ function showResult(output, result, targetMode) {
   }
 }
 
-function readDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(reader.result));
-    reader.addEventListener('error', () => reject(reader.error));
-    reader.readAsDataURL(blob);
-  });
-}
-
 async function exportResult(entry) {
   if (!entry.result?.images) return entry;
   const images = await Promise.all(entry.result.images.map(async (item) => {
@@ -115,7 +94,7 @@ async function exportResult(entry) {
     try {
       const response = await fetch(item.url);
       if (!response.ok) throw new Error('이미지 다운로드 실패');
-      return {...item, dataUrl: await readDataUrl(await response.blob())};
+      return {...item, dataUrl: await globalThis.modelLabFiles.readDataUrl(await response.blob())};
     } catch {
       return {...item, download: 'url-only'};
     }
@@ -129,7 +108,7 @@ async function downloadRun(record, photos, button, status) {
   try {
     const images = await Promise.all(photos.map(async (photo) => ({
       name: photo.name, type: photo.type, lastModified: photo.lastModified,
-      dataUrl: await readDataUrl(photo),
+      dataUrl: await globalThis.modelLabFiles.readDataUrl(photo),
     })));
     const results = await Promise.all(record.results.map(exportResult));
     const json = JSON.stringify({...record, images, results}, null, 2);
@@ -249,7 +228,9 @@ recordFile.addEventListener('change', async () => {
     for (const entry of files) URL.revokeObjectURL(entry.url);
     files.length = 0;
     for (const [name, value] of Object.entries(restored.input)) form.elements[name].value = value;
-    addFiles(restored.images);
+    for (const file of restored.images) files.push({file, url: URL.createObjectURL(file)});
+    attachmentStatus.textContent = '';
+    showAttachments();
     mode = restored.mode;
     syncClearButtons();
     showMode();
@@ -262,7 +243,7 @@ recordFile.addEventListener('change', async () => {
 
 document.querySelector('#sample').addEventListener('click', () => {
   form.elements.shop.value = '오라네일';
-  form.elements.instagramId.value = '@ora_nail';
+  form.elements.instagramId.value = 'ora_nail';
   form.elements.businessHours.value = '11:00–20:00';
   form.elements.booking.value = 'https://example.com/reserve';
   form.elements.prompt.value = '겨울 느낌의 이달의 아트를 만들어 주세요. 네 디자인 가격은 각각 39,000원입니다.';
@@ -281,7 +262,22 @@ form.addEventListener('submit', async (event) => {
   const startedAt = new Date().toISOString();
   if (pending[targetMode]) return;
   const input = Object.fromEntries(new FormData(form));
+  input.instagramId = input.instagramId.trim().replace(/^@+/, '');
+  input.booking = input.booking.trim();
+  const bookingUrl = URL.parse(input.booking);
+  if (input.booking && (!/^https?:\/\//i.test(input.booking) ||
+      !bookingUrl || !['http:', 'https:'].includes(bookingUrl.protocol))) {
+    const booking = form.elements.booking;
+    booking.setCustomValidity('http:// 또는 https://로 시작하는 예약 링크를 입력해 주세요.');
+    booking.reportValidity();
+    booking.setCustomValidity('');
+    return;
+  }
   const images = files.map(({file}) => file);
+  if (images.some((file) => !imageTypes.has(file.type))) {
+    attachmentStatus.textContent = '다시 실행하려면 JPG·PNG 이외의 첨부 파일을 제거해 주세요.';
+    return;
+  }
   const run = document.querySelector('#run-template').content.firstElementChild.cloneNode(true);
   const title = '실험 ' + (++runCounts[targetMode]);
   run.querySelector('h3').textContent = title;

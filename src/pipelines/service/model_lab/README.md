@@ -8,7 +8,7 @@
 
 ```sh
 git fetch origin
-git restore --source=origin/feat/service-model-lab -- src/pipelines/service/model_lab/
+git restore --source=origin/feat/service-model-lab -- src/pipelines/service/model_lab/ src/pipelines/service/shared/model-lab-files.js
 ```
 
 현재 브랜치에서 목업 폴더만 작업 트리에 가져옵니다. 가져온 뒤 아래 실행 절차를 따르면 됩니다. 목업 브랜치를 체크아웃하고 있다면 바로 실행 절차로 넘어가면 됩니다.

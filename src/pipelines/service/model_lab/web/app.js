@@ -44,31 +44,14 @@ function updateComposer() {
 
 // 첨부 이미지를 미리 보고 제출 전에는 제거할 수 있게 합니다.
 function renderAttachments(container, entries, removable = false) {
-  container.replaceChildren();
   container.hidden = entries.length === 0;
-  for (const entry of entries) {
-    const thumbnail = document.createElement("div");
-    thumbnail.className = "attachment";
-    const image = new Image();
-    image.src = entry.url;
-    image.alt = entry.file.name;
-    thumbnail.append(image);
-    if (removable) {
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.textContent = "×";
-      remove.setAttribute("aria-label", `${entry.file.name} 첨부 제거`);
-      remove.addEventListener("click", () => {
-        draftImages = draftImages.filter((candidate) => candidate !== entry);
-        URL.revokeObjectURL(entry.url);
-        imageUrls.delete(entry.url);
-        renderAttachments(attachments, draftImages, true);
-        attach.focus();
-      });
-      thumbnail.append(remove);
-    }
-    container.append(thumbnail);
-  }
+  globalThis.modelLabFiles.renderAttachments(container, entries, removable ? (entry) => {
+    draftImages = draftImages.filter((candidate) => candidate !== entry);
+    URL.revokeObjectURL(entry.url);
+    imageUrls.delete(entry.url);
+    renderAttachments(attachments, draftImages, true);
+    attach.focus();
+  } : undefined);
 }
 
 // 오류가 발생하면 입력을 유지한 상태에서 메시지를 보여줍니다.
