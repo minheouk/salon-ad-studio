@@ -8,160 +8,123 @@
 """
 
 import argparse
-import hashlib
 import json
 import re
 import time
+from email import policy
+from email.parser import BytesParser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-from src.pipelines.serving.mock import jobs
+from src.pipelines.serving.mock import generation
 from src.pipelines.serving.mock.signed_url import check_signed_url, signed_url
 from src.pipelines.serving.mock.validation import (
     MAX_FILE_BYTES,
     MAX_PHOTOS,
     ApiError,
-    check_photo,
     check_photos,
     check_prompt,
 )
 
 # 외부에 포트를 열지 않는다. VM에서는 SSH 포트 전달로만 접속한다.
 HOST = "127.0.0.1"
-# base64는 원본보다 약 4/3배 커지므로, 사진 최대 장수 × 최대 크기를 base64로 감싼 크기에 여유 1MB를 더한다.
-MAX_BODY_BYTES = MAX_PHOTOS * MAX_FILE_BYTES * 4 // 3 + 1024 * 1024
+GENERATE_PATH = "/generate"
+# 사진 최대 장수 × 최대 크기에, 텍스트 필드와 multipart 경계 문자열 몫으로 1MB를 더한다.
+MAX_BODY_BYTES = MAX_PHOTOS * MAX_FILE_BYTES + 1024 * 1024
 QUEUE_FULL_RETRY_AFTER_SECONDS = 10
-JOB_PATH = re.compile(r"/api/jobs/([0-9a-f]{32})(?:/(cancel|retry))?")
 RESULT_PATH = re.compile(r"/api/results/([0-9a-f]{32})/([0-9]+)")
 
-
-def validate_generate(body: dict) -> None:
-    check_photos(body.get("photos"))
-    check_prompt(body.get("prompt"))
-
-
-def validate_edit(body: dict) -> None:
-    check_photo(body.get("image"), 1)
-    check_prompt(body.get("prompt"))
-
-
-# 프롬프트에 이 표시가 있으면 목업 처리가 그 상태로 끝난다. 화면의 실패·시간 초과 화면을 시험하는 용도.
-MOCK_OUTCOME_MARKERS = {"[mock:failed]": jobs.FAILED, "[mock:timeout]": jobs.TIMEOUT}
+# 프롬프트에 이 표시가 있으면 목업 처리가 그 상태로 끝난다. 웹의 실패·시간 초과 화면을 시험하는 용도.
+MOCK_OUTCOME_MARKERS = {"[mock:failed]": generation.FAILED, "[mock:timeout]": generation.TIMEOUT}
 
 
 def mock_outcome(prompt: str) -> str:
-    for marker, status in MOCK_OUTCOME_MARKERS.items():
+    for marker, outcome in MOCK_OUTCOME_MARKERS.items():
         if marker in prompt:
-            return status
-    return jobs.SUCCEEDED
+            return outcome
+    return generation.SUCCEEDED
 
 
-# 주소 -> (작업 종류, 입력 검증, 결과 수)
-CREATE_ROUTES = {
-    "/api/jobs/generate": ("generate", validate_generate, 5),
-    "/api/jobs/edit": ("edit", validate_edit, 1),
-}
+def parse_form(content_type: str, body: bytes) -> tuple[dict[str, str], list[bytes]]:
+    """multipart/form-data 본문을 텍스트 필드와 images 파일 목록으로 나눈다."""
+    message = BytesParser(policy=policy.HTTP).parsebytes(
+        f"Content-Type: {content_type}\r\n\r\n".encode() + body
+    )
+    fields: dict[str, str] = {}
+    images: list[bytes] = []
+    for part in message.iter_parts():
+        name = part.get_param("name", header="content-disposition")
+        data = part.get_payload(decode=True) or b""
+        if name == "images":
+            images.append(data)
+        elif name:
+            fields[name] = data.decode("utf-8", errors="replace")
+    return fields, images
 
 
-def ms_between(start: float | None, end: float | None) -> int | None:
-    if start is None:
-        return None
-    return round(((end or time.monotonic()) - start) * 1000)
+def ms_between(start: float, end: float) -> int:
+    return round((end - start) * 1000)
 
 
-def job_view(job: jobs.Job) -> dict:
-    view = {
-        "job_id": job.id,
-        "type": job.kind,
-        "status": job.status,
-        "retries": job.retries,
+def generation_view(done: generation.Generation) -> dict:
+    return {
+        "generation_id": done.id,
         "timing_ms": {
-            "wait": ms_between(job.submitted_at, job.started_at or job.finished_at),
-            "run": ms_between(job.started_at, job.finished_at),
-            "total": ms_between(job.submitted_at, job.finished_at),
+            "wait": ms_between(done.received_at, done.started_at),
+            "run": ms_between(done.started_at, done.finished_at),
+            "total": ms_between(done.received_at, done.finished_at),
         },
+        "results": [
+            {"url": signed_url(f"/api/results/{done.id}/{number}"), "copy": result["copy"]}
+            for number, result in enumerate(done.results, start=1)
+        ],
+        "results_expire_in_seconds": round(
+            done.finished_wall_time + generation.RESULT_TTL_SECONDS - time.time()
+        ),
     }
-    if job.error:
-        view["error"] = job.error
-    if job.status == jobs.SUCCEEDED:
-        view["results"] = [
-            {"url": signed_url(f"/api/results/{job.id}/{number}"), "copy": result["copy"]}
-            for number, result in enumerate(job.results, start=1)
-        ]
-        view["results_expire_in_seconds"] = round(
-            job.finished_wall_time + jobs.RESULT_TTL_SECONDS - time.time()
-        )
-    return view
 
 
 class MockHandler(BaseHTTPRequestHandler):
-    store: jobs.JobStore
+    generator: generation.Generator
 
     def do_POST(self) -> None:
         try:
-            self.route_post(urlsplit(self.path).path)
+            if urlsplit(self.path).path != GENERATE_PATH:
+                raise ApiError("NOT_FOUND", "없는 주소입니다.", 404)
+            self.send_json(HTTPStatus.OK, generation_view(self.generate()))
         except ApiError as error:
             self.send_error_json(error)
 
     def do_GET(self) -> None:
         try:
-            self.route_get(urlsplit(self.path))
+            url = urlsplit(self.path)
+            match = RESULT_PATH.fullmatch(url.path)
+            if not match:
+                raise ApiError("NOT_FOUND", "없는 주소입니다.", 404)
+            check_signed_url(url.path, parse_qs(url.query))
+            self.send_png(self.generator.result_png(match[1], int(match[2])))
         except ApiError as error:
             self.send_error_json(error)
 
-    def route_post(self, path: str) -> None:
-        if path in CREATE_ROUTES:
-            self.create_job(*CREATE_ROUTES[path])
-            return
-        match = JOB_PATH.fullmatch(path)
-        if not match or not match[2]:
-            raise ApiError("NOT_FOUND", "없는 주소입니다.", 404)
-        action = self.store.cancel if match[2] == "cancel" else self.store.retry
-        self.send_json(HTTPStatus.ACCEPTED, job_view(action(match[1])))
+    def generate(self) -> generation.Generation:
+        fields, images = self.read_form()
+        # 처리 시간은 요청 본문을 다 받은 뒤부터 잰다. 업로드 시간은 넣지 않는다.
+        received_at = time.monotonic()
+        check_photos(images)
+        prompt = check_prompt(fields.get("prompt"))
+        return self.generator.generate(mock_outcome(prompt), received_at)
 
-    def route_get(self, url) -> None:
-        job_match = JOB_PATH.fullmatch(url.path)
-        if job_match and not job_match[2]:
-            self.send_json(HTTPStatus.OK, job_view(self.store.get(job_match[1])))
-            return
-        result_match = RESULT_PATH.fullmatch(url.path)
-        if not result_match:
-            raise ApiError("NOT_FOUND", "없는 주소입니다.", 404)
-        check_signed_url(url.path, parse_qs(url.query))
-        self.send_png(self.result_png(result_match[1], int(result_match[2])))
-
-    def create_job(self, kind: str, validate, result_count: int) -> None:
-        key = self.headers.get("Idempotency-Key")
-        if not key:
-            raise ApiError("MISSING_IDEMPOTENCY_KEY", "Idempotency-Key 헤더가 필요합니다.")
-        body = self.read_json()
-        validate(body)
-        fingerprint = hashlib.sha256(kind.encode() + json.dumps(body, sort_keys=True).encode()).hexdigest()
-        job, replayed = self.store.submit(key, fingerprint, kind, result_count, mock_outcome(body["prompt"]))
-        self.send_json(HTTPStatus.OK if replayed else HTTPStatus.ACCEPTED, job_view(job))
-
-    def result_png(self, job_id: str, number: int) -> bytes:
-        job = self.store.get(job_id)
-        if job.status != jobs.SUCCEEDED or not 1 <= number <= len(job.results):
-            raise ApiError("RESULT_NOT_FOUND", "결과를 찾을 수 없습니다.", 404)
-        return job.results[number - 1]["png"]
-
-    def read_json(self) -> dict:
+    def read_form(self) -> tuple[dict[str, str], list[bytes]]:
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY_BYTES:
             # 본문을 읽지 않고 거절하므로 연결을 닫아 남은 데이터가 다음 요청으로 섞이지 않게 한다.
             self.close_connection = True
             raise ApiError("BODY_TOO_LARGE", "요청 크기가 너무 큽니다.", 413)
-        if self.headers.get_content_type() != "application/json":
-            raise ApiError("INVALID_JSON", "JSON 형식으로 보내 주세요.", 415)
-        try:
-            body = json.loads(self.rfile.read(length))
-        except ValueError:
-            body = None
-        if not isinstance(body, dict):
-            raise ApiError("INVALID_JSON", "요청 형식이 올바르지 않습니다.")
-        return body
+        content_type = self.headers.get("Content-Type", "")
+        if self.headers.get_content_type() != "multipart/form-data":
+            raise ApiError("INVALID_FORM", "multipart/form-data 형식으로 보내 주세요.", 415)
+        return parse_form(content_type, self.rfile.read(length))
 
     def send_error_json(self, error: ApiError) -> None:
         headers = {}
@@ -190,7 +153,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="서빙 목업 API 서버")
     parser.add_argument("--port", type=int, default=8004)
     port = parser.parse_args().port
-    MockHandler.store = jobs.JobStore()
+    MockHandler.generator = generation.Generator()
     server = ThreadingHTTPServer((HOST, port), MockHandler)
     print(f"목업 API: http://{HOST}:{port}  (종료: Ctrl+C)")
     try:

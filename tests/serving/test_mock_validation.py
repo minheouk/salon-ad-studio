@@ -1,6 +1,5 @@
 """목업 API 입력 검증 규칙 테스트."""
 
-import base64
 import struct
 import zlib
 
@@ -30,10 +29,6 @@ def make_jpeg(width: int, height: int) -> bytes:
     return b"\xff\xd8" + b"\xff\xc0" + sof + b"\xff\xd9"
 
 
-def to_data_url(data: bytes, mime: str = "image/png") -> str:
-    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
-
-
 def error_code(call) -> str:
     with pytest.raises(ApiError) as caught:
         call()
@@ -41,8 +36,8 @@ def error_code(call) -> str:
 
 
 def test_png_and_jpeg_pass_with_their_size():
-    png = check_photo(to_data_url(make_png(1024, 768)), 1)
-    jpeg = check_photo(to_data_url(make_jpeg(4032, 3024), "image/jpeg"), 1)
+    png = check_photo(make_png(1024, 768), 1)
+    jpeg = check_photo(make_jpeg(4032, 3024), 1)
 
     assert (png.format, png.width, png.height) == ("png", 1024, 768)
     assert (jpeg.format, jpeg.width, jpeg.height) == ("jpeg", 4032, 3024)
@@ -60,18 +55,18 @@ def test_prompt_limit_is_100_chars():
 
 @pytest.mark.parametrize("count", [0, 6])
 def test_photo_count_must_be_1_to_5(count):
-    photos = [to_data_url(make_png(600, 600))] * count
+    photos = [make_png(600, 600)] * count
     assert error_code(lambda: check_photos(photos)) == "PHOTO_COUNT"
 
 
-def test_only_png_and_jpg_are_accepted():
-    gif = "data:image/gif;base64," + base64.b64encode(b"GIF89a").decode("ascii")
-    assert error_code(lambda: check_photo(gif, 1)) == "UNSUPPORTED_FORMAT"
+@pytest.mark.parametrize("data", [b"GIF89a", b"plain text pretending to be an image"])
+def test_only_png_and_jpg_are_accepted(data):
+    assert error_code(lambda: check_photo(data, 1)) == "UNSUPPORTED_FORMAT"
 
 
 def test_file_over_10mb_is_rejected():
     big = make_png(600, 600) + b"\x00" * MAX_FILE_BYTES
-    assert error_code(lambda: check_photo(to_data_url(big), 1)) == "FILE_TOO_LARGE"
+    assert error_code(lambda: check_photo(big, 1)) == "FILE_TOO_LARGE"
 
 
 @pytest.mark.parametrize(
@@ -81,15 +76,10 @@ def test_file_over_10mb_is_rejected():
         make_png(1024, 1024).replace(b"IDAT", b"IDAX"),  # 청크가 깨진 PNG (CRC 불일치)
         make_jpeg(1024, 1024)[:-2],  # 끝 표시가 없는 JPEG
         b"\x89PNG\r\n\x1a\n" + b"not a png",
-        b"plain text pretending to be an image",
     ],
 )
 def test_broken_files_are_rejected(data):
-    assert error_code(lambda: check_photo(to_data_url(data), 1)) == "BROKEN_IMAGE"
-
-
-def test_invalid_base64_is_rejected():
-    assert error_code(lambda: check_photo("data:image/png;base64,@@@", 1)) == "BROKEN_IMAGE"
+    assert error_code(lambda: check_photo(data, 1)) == "BROKEN_IMAGE"
 
 
 @pytest.mark.parametrize(
@@ -97,5 +87,4 @@ def test_invalid_base64_is_rejected():
     [(511, 1024, "RESOLUTION_TOO_LOW"), (8193, 1024, "RESOLUTION_TOO_HIGH")],
 )
 def test_resolution_limits(width, height, code):
-    photo = to_data_url(make_jpeg(width, height), "image/jpeg")
-    assert error_code(lambda: check_photo(photo, 1)) == code
+    assert error_code(lambda: check_photo(make_jpeg(width, height), 1)) == code

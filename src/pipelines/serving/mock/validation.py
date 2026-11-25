@@ -4,8 +4,6 @@
 이미지는 Pillow 없이 파일 구조(시그니처, 청크, 마커)만 읽어서 손상 여부와 해상도를 확인한다.
 """
 
-import base64
-import binascii
 import struct
 import zlib
 from dataclasses import dataclass
@@ -18,11 +16,6 @@ MIN_SIDE = 512
 # 48MP 이상 원본처럼 긴 변이 8192px을 넘는 사진은 받지 않는다. 일반 휴대폰 사진(12MP, 4032px)은 통과한다.
 MAX_SIDE = 8192
 
-DATA_URL_PREFIXES = (
-    "data:image/png;base64,",
-    "data:image/jpeg;base64,",
-    "data:image/jpg;base64,",
-)
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 JPEG_SIGNATURE = b"\xff\xd8\xff"
 # 해상도가 들어 있는 JPEG SOF 마커 (C4, C8, CC는 다른 용도라 제외)
@@ -57,55 +50,34 @@ def check_prompt(prompt: object) -> str:
     return prompt.strip()
 
 
-def check_photos(photos: object) -> list[Photo]:
-    if not isinstance(photos, list) or not 1 <= len(photos) <= MAX_PHOTOS:
+def check_photos(photos: list[bytes]) -> list[Photo]:
+    if not 1 <= len(photos) <= MAX_PHOTOS:
         raise ApiError("PHOTO_COUNT", f"사진은 1장에서 {MAX_PHOTOS}장까지 올릴 수 있습니다.")
     return [check_photo(photo, number) for number, photo in enumerate(photos, start=1)]
 
 
-def check_photo(data_url: object, number: int) -> Photo:
-    data = decode_data_url(data_url, number)
+def check_photo(data: bytes, number: int) -> Photo:
+    """파일 내용으로 형식을 판별한다. 파일 이름이나 Content-Type 표기는 믿지 않는다."""
     if len(data) > MAX_FILE_BYTES:
         raise ApiError(
             "FILE_TOO_LARGE",
             f"{number}번째 사진이 {MAX_FILE_BYTES // (1024 * 1024)}MB를 넘습니다.",
         )
-    photo = read_photo(data)
-    if photo is None:
-        raise ApiError(
-            "BROKEN_IMAGE", f"{number}번째 사진 파일이 손상되었습니다. 다른 사진을 올려 주세요."
-        )
-    check_resolution(photo, number)
-    return photo
-
-
-def decode_data_url(data_url: object, number: int) -> bytes:
-    if not isinstance(data_url, str) or not data_url.startswith(DATA_URL_PREFIXES):
+    if data.startswith(PNG_SIGNATURE):
+        fmt, size = "png", read_png_size(data)
+    elif data.startswith(JPEG_SIGNATURE):
+        fmt, size = "jpeg", read_jpeg_size(data)
+    else:
         raise ApiError(
             "UNSUPPORTED_FORMAT", f"{number}번째 사진은 PNG 또는 JPG 파일만 올릴 수 있습니다."
         )
-    encoded = data_url.partition(",")[2]
-    try:
-        return base64.b64decode(encoded, validate=True)
-    except binascii.Error:
+    if size is None:
         raise ApiError(
             "BROKEN_IMAGE", f"{number}번째 사진 파일이 손상되었습니다. 다른 사진을 올려 주세요."
-        ) from None
-
-
-def read_photo(data: bytes) -> Photo | None:
-    """파일 내용으로 형식을 판별한다. 확장자나 data URL의 형식 표기는 믿지 않는다."""
-    if data.startswith(PNG_SIGNATURE):
-        size = read_png_size(data)
-        fmt = "png"
-    elif data.startswith(JPEG_SIGNATURE):
-        size = read_jpeg_size(data)
-        fmt = "jpeg"
-    else:
-        return None
-    if size is None:
-        return None
-    return Photo(fmt, *size)
+        )
+    photo = Photo(fmt, *size)
+    check_resolution(photo, number)
+    return photo
 
 
 def read_png_size(data: bytes) -> tuple[int, int] | None:

@@ -11,7 +11,8 @@ import time
 
 from src.pipelines.serving.mock.validation import ApiError
 
-URL_TTL_SECONDS = 60 * 60
+# 결과를 다시 조회하는 API가 없으므로, 생성 응답에서 받은 주소를 결과 보관 기간(24시간) 동안 쓸 수 있게 한다.
+URL_TTL_SECONDS = 24 * 60 * 60
 SECRET = secrets.token_bytes(32)
 
 
@@ -30,6 +31,4 @@ def check_signed_url(path: str, query: dict[str, list[str]]) -> None:
     if not expires.isdigit() or not hmac.compare_digest(signature, sign(path, int(expires))):
         raise ApiError("INVALID_SIGNATURE", "올바르지 않은 다운로드 주소입니다.", 403)
     if int(expires) < time.time():
-        raise ApiError(
-            "URL_EXPIRED", "다운로드 주소가 만료되었습니다. 작업 상태를 다시 조회해 새 주소를 받아 주세요.", 403
-        )
+        raise ApiError("URL_EXPIRED", "다운로드 주소가 만료되었습니다. 광고를 다시 만들어 주세요.", 403)
