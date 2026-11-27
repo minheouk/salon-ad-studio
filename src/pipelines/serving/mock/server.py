@@ -25,6 +25,7 @@ from src.pipelines.serving.mock.validation import (
     MAX_PHOTOS,
     ApiError,
     check_copy_images,
+    check_edit_instructions,
     check_edit_prompts,
     check_photos,
     check_prompt,
@@ -33,9 +34,10 @@ from src.pipelines.serving.mock.validation import (
 # 외부에 포트를 열지 않는다. VM에서는 SSH 포트 전달로만 접속한다.
 HOST = "127.0.0.1"
 # 주소 -> 생성 종류.
-# /generate: 네일 팁 세트 사진 1장으로 이미지를 만든다. 결과 수정 단계도 이미지만 다룬다.
+# /generate: 네일 팁 세트 사진 1장으로 이미지를 만든다.
+# /edit: 결과 수정 단계. 이미지 1장을 받아 수정본 1장을 만든다. 문구는 만들지 않는다.
 # /copy: 이미지를 다 고른 뒤 게시 미리보기에서 따로 부른다. 최종 이미지 여러 장으로 문구를 만든다.
-GENERATE_ROUTES = {"/generate": generation.IMAGES, "/copy": generation.COPY}
+GENERATE_ROUTES = {"/generate": generation.IMAGES, "/edit": generation.EDIT, "/copy": generation.COPY}
 # 웹 백엔드가 채팅에 저장해 둔 매장 정보. /copy는 이 값을 게시글 본문에 넣는다.
 STORE_FIELDS = ("shop", "instagramId", "businessHours", "booking")
 # 이미지 최대 장수 × 최대 크기에, 텍스트 필드와 multipart 경계 문자열 몫으로 1MB를 더한다.
@@ -43,6 +45,7 @@ STORE_FIELDS = ("shop", "instagramId", "businessHours", "booking")
 EXTRA_BODY_BYTES = 1024 * 1024
 MAX_BODY_BYTES = {
     generation.IMAGES: MAX_PHOTOS * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
+    generation.EDIT: MAX_PHOTOS * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
     generation.COPY: MAX_COPY_IMAGES * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
 }
 QUEUE_FULL_RETRY_AFTER_SECONDS = 10
@@ -84,6 +87,32 @@ def last_value(fields: dict[str, list[str]], name: str) -> str | None:
     return values[-1] if values else None
 
 
+def check_generate_input(fields: dict[str, list[str]], images: list[bytes]) -> str:
+    check_photos(images)
+    return check_prompt(last_value(fields, "prompt"))
+
+
+def check_edit_input(fields: dict[str, list[str]], images: list[bytes]) -> str:
+    # 수정할 이미지 1장과, 공통 프롬프트·개별 프롬프트 중 하나 이상을 받는다.
+    check_photos(images)
+    return check_edit_instructions(last_value(fields, "prompt"), last_value(fields, "imagePrompt"))
+
+
+def check_copy_input(fields: dict[str, list[str]], images: list[bytes]) -> str:
+    # 게시할 최종 이미지 여러 장과, 최초 프롬프트에 더해 수정 단계의 수정 프롬프트도 받는다.
+    check_copy_images(images)
+    check_edit_prompts(fields.get("editPrompts", []))
+    return check_prompt(last_value(fields, "prompt"))
+
+
+# 생성 종류 -> 입력 검사. 검사를 통과하면 목업 표시([mock:...])를 찾을 프롬프트를 돌려준다.
+INPUT_CHECKS = {
+    generation.IMAGES: check_generate_input,
+    generation.EDIT: check_edit_input,
+    generation.COPY: check_copy_input,
+}
+
+
 def ms_between(start: float, end: float) -> int:
     return round((end - start) * 1000)
 
@@ -96,6 +125,15 @@ def generation_view(done: generation.Generation) -> dict:
     }
     if done.copy is not None:
         return {"timing_ms": timing, **done.copy}
+    expires_in = round(done.finished_wall_time + generation.RESULT_TTL_SECONDS - time.time())
+    if done.kind == generation.EDIT:
+        # 수정본은 1장이라 목록 대신 result 하나로 준다. 종류(type)는 보낸 쪽이 알고 있어서 넣지 않는다.
+        return {
+            "generation_id": done.id,
+            "timing_ms": timing,
+            "result": {"url": signed_url(f"/api/results/{done.id}/1")},
+            "results_expire_in_seconds": expires_in,
+        }
     return {
         "generation_id": done.id,
         "timing_ms": timing,
@@ -103,9 +141,7 @@ def generation_view(done: generation.Generation) -> dict:
             {"type": result["type"], "url": signed_url(f"/api/results/{done.id}/{number}")}
             for number, result in enumerate(done.results, start=1)
         ],
-        "results_expire_in_seconds": round(
-            done.finished_wall_time + generation.RESULT_TTL_SECONDS - time.time()
-        ),
+        "results_expire_in_seconds": expires_in,
     }
 
 
@@ -136,13 +172,7 @@ class MockHandler(BaseHTTPRequestHandler):
         fields, images = self.read_form(MAX_BODY_BYTES[kind])
         # 처리 시간은 요청 본문을 다 받은 뒤부터 잰다. 업로드 시간은 넣지 않는다.
         received_at = time.monotonic()
-        if kind == generation.COPY:
-            # 게시할 최종 이미지 여러 장과, 최초 프롬프트에 더해 수정 단계의 수정 프롬프트도 받는다.
-            check_copy_images(images)
-            check_edit_prompts(fields.get("editPrompts", []))
-        else:
-            check_photos(images)
-        prompt = check_prompt(last_value(fields, "prompt"))
+        prompt = INPUT_CHECKS[kind](fields, images)
         # 매장 정보 형식 검사는 웹 백엔드가 한다. 목업은 받은 값을 그대로 쓴다.
         store = {name: last_value(fields, name) or "" for name in STORE_FIELDS}
         return self.generator.generate(kind, mock_outcome(prompt), received_at, store)

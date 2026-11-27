@@ -10,9 +10,11 @@ from functools import lru_cache
 PLACEHOLDER_SIDE = 1024
 PLACEHOLDER_COLORS = ((236, 72, 153), (59, 130, 246), (16, 185, 129), (245, 158, 11), (139, 92, 246))
 PRICE_TABLE_COLOR = (31, 41, 55)
+# 수정한 이미지는 흰색으로 만들어, 화면에서 원래 이미지와 바뀐 것을 바로 알아볼 수 있게 한다.
+EDITED_COLOR = (255, 255, 255)
 
 
-@lru_cache(maxsize=len(PLACEHOLDER_COLORS) + 1)
+@lru_cache(maxsize=len(PLACEHOLDER_COLORS) + 2)
 def placeholder_png(color: tuple[int, int, int]) -> bytes:
     def chunk(kind: bytes, body: bytes) -> bytes:
         return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
@@ -35,6 +37,11 @@ def fake_ads(nail_tip_count: int) -> list[dict]:
         for index in range(nail_tip_count)
     ]
     return [price_table, *nail_tips]
+
+
+def fake_edit() -> list[dict]:
+    """수정한 이미지 1장. 목업은 어떤 이미지를 받아도 같은 흰색 PNG를 돌려준다."""
+    return [{"png": placeholder_png(EDITED_COLOR)}]
 
 
 def fake_copy(store: dict[str, str]) -> dict:

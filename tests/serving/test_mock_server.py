@@ -80,6 +80,13 @@ def generate(
     return status, headers, json.loads(raw)
 
 
+def edit(api: str, fields: list[tuple[str, str]], images: list[bytes] | None = None):
+    images = [make_png(1024, 1024)] if images is None else images
+    body, content_type = encode_form(fields, images)
+    status, headers, raw = request(api + "/edit", body, {"Content-Type": content_type})
+    return status, headers, json.loads(raw)
+
+
 def test_generate_returns_price_table_first_then_nail_tips(api):
     status, _, body = generate(api, images=[make_jpeg(4032, 3024)])
     assert status == 200
@@ -141,6 +148,45 @@ def test_copy_rejects_wrong_image_count(api, count):
 def test_copy_rejects_empty_edit_prompt(api):
     status, _, body = generate(api, path="/copy", edit_prompts=(" ",))
     assert (status, body["error"]["code"], body["error"]["field"]) == (400, "EMPTY_PROMPT", "editPrompts")
+
+
+def test_edit_returns_one_downloadable_result(api):
+    status, _, body = edit(api, [("prompt", "배경을 더 밝게 바꿔 주세요.")])
+    assert status == 200
+    assert set(body) == {"generation_id", "timing_ms", "result", "results_expire_in_seconds"}
+
+    status, headers, png = request(api + body["result"]["url"])
+    assert (status, headers["Content-Type"]) == (200, "image/png")
+    assert png.startswith(b"\x89PNG")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [[("prompt", "배경을 더 밝게")], [("imagePrompt", "글자를 크게")], [("prompt", "밝게"), ("imagePrompt", "크게")]],
+)
+def test_edit_accepts_common_or_individual_prompt(api, fields):
+    assert edit(api, fields)[0] == 200
+
+
+@pytest.mark.parametrize(
+    ("fields", "images", "code", "field"),
+    [
+        ([], None, "EMPTY_PROMPT", "prompt"),
+        ([("prompt", "밝게"), ("imagePrompt", " ")], None, "EMPTY_PROMPT", "imagePrompt"),
+        ([("imagePrompt", "가" * 201)], None, "PROMPT_TOO_LONG", "imagePrompt"),
+        ([("prompt", "밝게")], [make_png(1024, 1024)] * 2, "PHOTO_COUNT", "images"),
+    ],
+)
+def test_edit_rejects_invalid_input(api, fields, images, code, field):
+    status, _, body = edit(api, fields, images)
+    assert (status, body["error"]["code"], body["error"]["field"]) == (400, code, field)
+
+
+@pytest.mark.parametrize("name", ["prompt", "imagePrompt"])
+def test_edit_marker_forces_failure_in_either_prompt(api, name):
+    status, _, body = edit(api, [(name, "밝게 [mock:failed]")])
+    message = "광고를 수정하지 못했습니다. 다시 시도해 주세요."
+    assert (status, body) == (502, {"error": {"code": "GENERATION_FAILED", "field": None, "message": message}})
 
 
 @pytest.mark.parametrize(

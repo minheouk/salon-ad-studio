@@ -67,8 +67,23 @@ def check_edit_prompts(prompts: list[str]) -> list[str]:
     return [check_prompt(prompt, field="editPrompts") for prompt in prompts]
 
 
+def check_edit_instructions(common: str | None, individual: str | None) -> str:
+    """/edit: 공통 프롬프트(prompt)와 개별 프롬프트(imagePrompt) 중 하나 이상.
+
+    보낸 값은 prompt와 같은 규칙으로 검사한다. 둘 다 없으면 prompt가 비었다고 알린다.
+    """
+    sent = {
+        name: value
+        for name, value in (("prompt", common), ("imagePrompt", individual))
+        if value is not None
+    }
+    if not sent:
+        raise ApiError("EMPTY_PROMPT", "요청 내용을 입력해 주세요.", field="prompt")
+    return " ".join(check_prompt(value, field=name) for name, value in sent.items())
+
+
 def check_photos(photos: list[bytes]) -> list[Photo]:
-    """/generate: 네일 팁 세트 사진 정확히 1장."""
+    """/generate·/edit: 이미지 정확히 1장."""
     if len(photos) != MAX_PHOTOS:
         raise ApiError("PHOTO_COUNT", f"사진은 {MAX_PHOTOS}장만 올릴 수 있습니다.", field="images")
     return [check_photo(photo, number) for number, photo in enumerate(photos, start=1)]

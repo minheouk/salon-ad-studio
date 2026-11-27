@@ -10,7 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
-from src.pipelines.serving.mock.fake_results import fake_ads, fake_copy
+from src.pipelines.serving.mock.fake_results import fake_ads, fake_copy, fake_edit
 from src.pipelines.serving.mock.validation import ApiError
 
 # 목업이 끝날 상태. 프롬프트의 표시로 실패·시간 초과를 일부러 만들 수 있다.
@@ -18,8 +18,9 @@ SUCCEEDED = "succeeded"
 FAILED = "failed"
 TIMEOUT = "timeout"
 
-# 생성 종류. 이미지(/generate)와 광고 문구(/copy)는 같은 대기열에서 차례로 처리한다.
+# 생성 종류. 이미지(/generate), 이미지 수정(/edit), 광고 문구(/copy)는 같은 대기열에서 차례로 처리한다.
 IMAGES = "images"
+EDIT = "edit"
 COPY = "copy"
 
 # 결과 이미지는 가격표 1장 + 네일 팁 최대 12장. 목업은 최대 장수로 만든다.
@@ -34,12 +35,14 @@ MOCK_DELAY_SECONDS = 3
 
 FAILED_MESSAGES = {
     IMAGES: "광고를 만들지 못했습니다. 다시 시도해 주세요.",
+    EDIT: "광고를 수정하지 못했습니다. 다시 시도해 주세요.",
     COPY: "광고 문구를 만들지 못했습니다. 다시 시도해 주세요.",
 }
 
 
 @dataclass
 class Generation:
+    kind: str
     received_at: float
     started_at: float
     finished_at: float
@@ -97,8 +100,9 @@ class Generator:
         if outcome == FAILED:
             raise ApiError("GENERATION_FAILED", FAILED_MESSAGES[kind], 502)
         if kind == COPY:
-            return Generation(received_at, started_at, time.monotonic(), copy=fake_copy(store))
-        generation = Generation(received_at, started_at, time.monotonic(), results=fake_ads(NAIL_TIP_COUNT))
+            return Generation(kind, received_at, started_at, time.monotonic(), copy=fake_copy(store))
+        results = fake_edit() if kind == EDIT else fake_ads(NAIL_TIP_COUNT)
+        generation = Generation(kind, received_at, started_at, time.monotonic(), results=results)
         # 다운로드할 이미지가 있는 결과만 보관한다.
         with self.lock:
             self.remove_expired()

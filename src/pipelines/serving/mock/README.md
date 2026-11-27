@@ -14,11 +14,36 @@
 저장소 루트에서 실행합니다. `--port`에는 [VM 가이드](../../../../docs/vm_member_guide.md)에 있는 **본인 API 포트**(`800N`)를 넣습니다.
 
 ```sh
-python -m src.pipelines.serving.mock.server --port 8004
+python3 -m src.pipelines.serving.mock.server --port 8004
 ```
 
 - 서버는 `127.0.0.1`에서만 받습니다. **외부에 포트를 열지 않습니다.** VM에서 띄웠다면 SSH 포트 전달로 내 PC에서 접속합니다.
+- 팀 VM에서 오래 켜 둘 때는 `tmux` 안에서 실행합니다. `Ctrl+B`를 누른 뒤 `D`를 누르면 서버는 켜 둔 채로 빠져나옵니다.
 - 종료는 실행한 터미널에서 `Ctrl+C`를 누릅니다. 결과는 메모리에만 있어서 서버를 끄면 모두 사라집니다.
+
+## 웹 백엔드에서 연결하기
+
+| 용도 | `AI_BASE_URL` |
+|---|---|
+| 개발·목업 연결 | `http://127.0.0.1:8004` |
+| 통합 테스트·시연 | `http://127.0.0.1:8000` (팀 공용 데모 포트, 쓰기 전에 디스코드에 공지) |
+
+- 웹 백엔드가 **팀 VM 안에서** 실행된다는 전제입니다. VM 밖에서 실행되면 이 주소로는 접근할 수 없어서, 연결 방법을 PM과 따로 정해야 합니다.
+- 공통 경로는 없습니다. `{AI_BASE_URL}/generate`, `{AI_BASE_URL}/edit`, `{AI_BASE_URL}/copy`로 부릅니다. 결과 다운로드는 응답의 `url`을 `AI_BASE_URL` 뒤에 붙여 `GET`합니다.
+- **인증 헤더는 없습니다.** VM 안과 SSH 연결로만 접근할 수 있어서 이미 막혀 있습니다. 사용자의 Supabase 토큰은 AI 서버로 보내지 않습니다.
+
+### 내 PC에서 시험하기
+
+- **VS Code Remote-SSH**로 VM에 접속해 있으면 포트가 자동으로 연결됩니다. 내 PC에서 같은 번호를 이미 쓰고 있으면 다른 번호(예: 8005)로 연결되니, VS Code 아래 패널의 **포트** 탭에서 "전달된 주소"를 확인합니다.
+- **VS Code 없이**: 내 PC의 PowerShell에서 실행하고, 그 창을 켜 둔 채 `http://localhost:8004`로 부릅니다. VM 이름·zone·프로젝트 ID는 디스코드 VM 공지에 있습니다.
+
+  ```powershell
+  gcloud compute ssh <VM_NAME> --zone <ZONE> --project <PROJECT_ID> --ssh-flag="-N" --ssh-flag="-L 8004:127.0.0.1:8004"
+  ```
+
+  - VM 안에서 실행하면 권한 오류가 납니다. 반드시 **내 PC**에서 실행합니다.
+  - PowerShell은 `--`를 지워 버려서 `-- -N -L ...` 형식이 안 됩니다. `--ssh-flag`로 넘깁니다.
+- **연결 확인**: `http://localhost:<포트>/`를 열어 `{"error": {"code": "NOT_FOUND", ...}}`가 보이면 정상입니다. 계속 로딩되거나 연결이 끊기면 VM에서 목업 서버가 꺼져 있는 것입니다.
 
 ## 전체 흐름
 
@@ -28,7 +53,7 @@ python -m src.pipelines.serving.mock.server --port 8004
 1. POST /generate              → 이미지 생성. 처리가 끝날 때까지 대기 (목업은 3초)
 2. 200 응답의 results[].url     → 이미지를 바로 내려받아 웹 백엔드가 보관 (GET)
    실패(502)·시간 초과(504)·대기열 가득(429) → 사용자가 다시 시도할 때만 같은 요청을 다시 보냄
-3. 결과 수정 단계               → 이미지만 수정 (AI-02, 목업에는 아직 없음)
+3. 결과 수정 단계               → POST /edit: 이미지 1장씩 수정, 응답의 result.url로 내려받음
 4. 게시 미리보기                 → POST /copy: 고른 최종 이미지로 광고 문구 생성
 ```
 
@@ -45,7 +70,7 @@ python -m src.pipelines.serving.mock.server --port 8004
 - **504 `TIMEOUT`**: 서빙은 그 요청의 처리를 끝내고 결과를 버립니다. 다시 보내도 결과가 두 번 만들어지지 않습니다.
   - 웹 백엔드는 이 코드를 사용자에게 `504 GENERATION_TIMEOUT`으로 바꿔 보냅니다. 웹 자체 70초 대기를 넘긴 경우도 같은 코드입니다.
 - **광고 문구(`/copy`)만 실패한 경우**: 고른 이미지와 순서는 그대로 두고 `/copy`만 다시 요청합니다.
-- 생성은 **한 번에 하나씩 순서대로** 처리합니다. 이미지와 광고 문구 요청은 같은 대기열을 씁니다.
+- 생성은 **한 번에 하나씩 순서대로** 처리합니다. 이미지 생성·수정·광고 문구 요청은 같은 대기열을 씁니다.
 
 ## 광고 생성: `POST /generate`
 
@@ -100,7 +125,8 @@ curl -X POST http://127.0.0.1:8004/generate \
 예: `prompt=겨울 네일 광고 [mock:failed]`
 
 - 60초를 기다리지 않도록, 다른 요청처럼 **3초 뒤에** 응답합니다.
-- `/generate`와 `/copy` 모두 됩니다. `/copy`의 실패 문구는 `광고 문구를 만들지 못했습니다. 다시 시도해 주세요.`입니다.
+- `/generate`, `/edit`, `/copy` 모두 됩니다. `/edit`은 `prompt`와 `imagePrompt` 어느 쪽에 넣어도 됩니다.
+- 실패 문구는 `/edit`이 `광고를 수정하지 못했습니다. 다시 시도해 주세요.`, `/copy`가 `광고 문구를 만들지 못했습니다. 다시 시도해 주세요.`입니다.
 - 표시도 200자 제한에 포함됩니다.
 - **목업 전용 기능입니다.** 실제 서빙 API에는 넣지 않습니다.
 
@@ -113,6 +139,46 @@ curl -X POST http://127.0.0.1:8004/generate \
 | `total` | 요청을 받은 때부터 끝까지 = `wait` + `run` |
 
 - 서버가 요청 본문을 다 받은 뒤부터 잽니다. 업로드·다운로드 같은 **네트워크 시간은 들어가지 않습니다.** 사용자가 체감하는 전체 시간은 웹에서 재면 됩니다.
+
+## 광고 이미지 수정: `POST /edit`
+
+API 명세의 AI-02입니다. **결과 수정 단계에서** 웹 백엔드가 부릅니다. 이미지만 수정하고 광고 문구는 만들지 않습니다.
+수정할 이미지 1장을 보내면 수정본 1장을 돌려줍니다. 여러 장을 고칠 때는 앞 요청의 응답을 받은 뒤 다음 이미지를 보냅니다.
+
+```sh
+curl -X POST http://127.0.0.1:8004/edit \
+  -F "prompt=전체 배경을 더 밝게 바꿔 주세요." \
+  -F "imagePrompt=이 이미지는 글자를 더 크게 해 주세요." \
+  -F "images=@result-2.png"
+```
+
+| 필드 | 규칙 |
+|---|---|
+| `images` | 수정할 이미지 정확히 1장. 웹 백엔드가 보관한 결과 파일. PNG 또는 JPG, 10MB 이하 |
+| `prompt` | 공통 프롬프트. 여러 장에 똑같이 적용할 수정 내용 |
+| `imagePrompt` | 개별 프롬프트. 이 이미지에만 적용할 수정 내용 |
+
+- `prompt`와 `imagePrompt` 중 **하나 이상**을 보냅니다. 둘 다 없으면 `400 EMPTY_PROMPT`(`field`: `prompt`)입니다.
+- 보낸 값은 `/generate`의 `prompt`와 같은 규칙(앞뒤 공백을 뺀 뒤 1~200자)으로 검사합니다. 보냈는데 비어 있으면 `400 EMPTY_PROMPT`이고, `field`에 그 필드 이름이 들어갑니다.
+- 연속 수정 3회 제한(`EDIT_LIMIT_EXCEEDED`)은 웹 백엔드가 검사합니다. 서빙은 이전 수정 횟수를 기억하지 않습니다.
+- **수정 대상은 네일 팁 이미지만입니다.** 가격표 수정 지원 여부는 모델팀 확인 대기입니다.
+  - 가격표는 한글 문구와 가격을 이미지 위에 합성해서 만듭니다. 이미지 수정 모델로 고치면 글자가 깨질 수 있어서, 고칠 수 있게 되더라도 가격·문구를 바꿔 다시 합성하는 별도 방식이 될 수 있습니다.
+  - 목업은 이미지 종류를 구분하지 않아 가격표를 보내도 수정본을 돌려줍니다. 화면 시험용 동작입니다.
+
+정상 응답 (`200`). `/generate`처럼 다운로드 주소를 돌려줍니다. 수정본은 1장이라 `results` 목록 대신 `result` 하나입니다.
+
+```json
+{
+  "generation_id": "7b1c...",
+  "timing_ms": {"wait": 0, "run": 3001, "total": 3001},
+  "result": {"url": "/api/results/7b1c.../1?expires=...&signature=..."},
+  "results_expire_in_seconds": 86400
+}
+```
+
+- 목업의 수정본은 흰색 PNG(1024×1024)입니다. 화면에서 원래 이미지와 바뀐 것을 바로 알아볼 수 있습니다.
+- 이미지 종류(`price_table`·`nail_tip`)는 보낸 쪽이 알고 있어서 응답에 넣지 않습니다.
+- 다운로드, 24시간 보관, 오류 응답은 `/generate`와 같습니다.
 
 ## 광고 문구 생성: `POST /copy`
 
@@ -189,7 +255,7 @@ Retry-After: 10
 
 실패하면 HTTP 상태 번호와 함께 `error` 안에 `code`, `field`, `message`를 돌려줍니다. 웹 탭(WEB-xx)의 오류 형식과 같습니다.
 - 웹에서는 **HTTP 상태 번호로 입력 오류(4xx)인지 판단**하고, `code`로 분기합니다.
-- `field`는 문제가 된 요청 필드 이름(`images`, `prompt`)입니다. 필드와 관계없는 오류는 `null`입니다.
+- `field`는 문제가 된 요청 필드 이름(`images`, `prompt`, `imagePrompt`, `editPrompts`)입니다. 필드와 관계없는 오류는 `null`입니다.
 - `message`는 사용자에게 그대로 보여 주면 됩니다.
 
 ```json
@@ -200,15 +266,15 @@ Retry-After: 10
 
 | HTTP | `code` | `field` | 언제 |
 |---|---|---|---|
-| 400 | `EMPTY_PROMPT` | `prompt`, `editPrompts` | 앞뒤 공백을 빼면 비어 있음 |
-| 400 | `PROMPT_TOO_LONG` | `prompt`, `editPrompts` | 요청 내용이 200자를 넘음 |
-| 400 | `PHOTO_COUNT` | `images` | `/generate`: 사진이 1장이 아님 / `/copy`: 이미지가 1~13장이 아님 |
+| 400 | `EMPTY_PROMPT` | `prompt`, `imagePrompt`, `editPrompts` | 앞뒤 공백을 빼면 비어 있음. `/edit`은 두 프롬프트가 모두 없을 때도 |
+| 400 | `PROMPT_TOO_LONG` | `prompt`, `imagePrompt`, `editPrompts` | 요청 내용이 200자를 넘음 |
+| 400 | `PHOTO_COUNT` | `images` | `/generate`·`/edit`: 이미지가 1장이 아님 / `/copy`: 이미지가 1~13장이 아님 |
 | 400 | `UNSUPPORTED_FORMAT` | `images` | 파일 내용이 PNG·JPG가 아님 |
 | 400 | `FILE_TOO_LARGE` | `images` | 사진 한 장이 10MB를 넘음 |
 | 400 | `BROKEN_IMAGE` | `images` | 파일이 손상됨 (아래 참고) |
 | 400 | `RESOLUTION_TOO_LOW` | `images` | 짧은 변이 512px 미만 |
 | 400 | `RESOLUTION_TOO_HIGH` | `images` | 긴 변이 8192px 초과 |
-| 413 | `BODY_TOO_LARGE` | `null` | 요청 전체가 한도를 넘음. `/generate` 11MB(사진 10MB + 텍스트 여유 1MB), `/copy` 131MB(13장 × 10MB + 1MB, 임시) |
+| 413 | `BODY_TOO_LARGE` | `null` | 요청 전체가 한도를 넘음. `/generate`·`/edit` 11MB(사진 10MB + 텍스트 여유 1MB), `/copy` 131MB(13장 × 10MB + 1MB, 임시) |
 | 415 | `INVALID_FORM` | `null` | `Content-Type`이 `multipart/form-data`가 아님 |
 
 여러 장 중 하나가 문제면 `message`에 몇 번째 사진인지 적어 줍니다. 예: `2번째 사진 파일이 손상되었습니다.`
@@ -217,7 +283,7 @@ Retry-After: 10
 
 | HTTP | `code` | 언제 |
 |---|---|---|
-| 502 | `GENERATION_FAILED` | 모델이 광고를 만들지 못함 |
+| 502 | `GENERATION_FAILED` | 모델이 광고를 만들거나 수정하지 못함 |
 | 504 | `TIMEOUT` | 요청을 받은 때부터 60초가 넘음 (웹 백엔드가 `GENERATION_TIMEOUT`으로 바꿔 보냄) |
 | 429 | `QUEUE_FULL` | 처리 중·대기 중 요청이 가득 참 (`Retry-After` 헤더 포함) |
 | 403 | `INVALID_SIGNATURE` | 다운로드 주소가 올바르지 않음 |
@@ -244,7 +310,7 @@ Retry-After: 10
 - **결과 이미지 ID**: `results[]`에 넣을 이미지 ID의 필드 이름과 형식은 아직 정해지지 않아 목업에 넣지 않았습니다.
 - **네일 팁 이미지 수**: 실제 모델이 몇 장(최대 12장)을 만들지 정해지면 맞춥니다. 목업은 항상 12장입니다.
 - **대기 가능한 요청 수**: 처리 중 1개와 대기 2개는 임시로 정한 값입니다.
-- **광고 수정 API (AI-02)**: 이미지만 수정합니다. 이미지 파일 1장과 공통·개별 프롬프트를 받아 수정본 1장을 돌려줍니다. 모델팀이 수정 지원 여부를 정하면 같은 동기 방식으로 추가합니다.
+- **`/edit` 요청 형식**: 개별 프롬프트 필드 이름(`imagePrompt`)과, 공통·개별 프롬프트가 부딪힐 때의 우선순위는 임시입니다. 모델팀이 수정 기능 지원 여부와 입력 형식을 확인하면 맞춥니다.
 - **결과 파일 저장 위치**: 목업은 메모리에 둡니다. 실제 서버는 24시간 보관할 곳(`outputs/` 등, 커밋 금지)을 정해야 합니다.
 - **5초 동영상**: 지원 여부가 정해지면 추가합니다.
 - **이 요청·응답 형식은 아직 서빙 쪽 제안입니다.** 서비스·모델 담당과 합의하면 `src/common/`에 정의합니다. `src/common/`은 공용 파일이라 PM 승인이 필요합니다.
