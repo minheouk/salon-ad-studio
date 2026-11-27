@@ -257,13 +257,15 @@ def test_result_is_removed_after_retention(api, monkeypatch):
 
 def test_json_body_is_rejected(api):
     status, _, raw = request(f"{api}/generate", b"{}", {"Content-Type": "application/json"})
-    assert (status, json.loads(raw)["error"]["code"]) == (415, "INVALID_FORM")
+    message = "요청 형식이 올바르지 않습니다. multipart/form-data로 보내 주세요."
+    assert (status, json.loads(raw)) == (415, {"error": {"code": "INVALID_FORM", "field": None, "message": message}})
 
 
 def test_oversized_body_is_rejected_before_reading(api):
     headers = {"Content-Type": "multipart/form-data; boundary=x", "Content-Length": str(10**9)}
     status, _, raw = request(f"{api}/generate", b"--x--", headers)
-    assert (status, json.loads(raw)["error"]["code"]) == (413, "BODY_TOO_LARGE")
+    message = "요청 크기가 너무 큽니다. 용량이 더 작은 사진으로 다시 시도해 주세요."
+    assert (status, json.loads(raw)) == (413, {"error": {"code": "BODY_TOO_LARGE", "field": None, "message": message}})
 
 
 @pytest.mark.parametrize("path", ["/api/unknown", "/api/jobs/generate"])

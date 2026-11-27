@@ -183,10 +183,14 @@ class MockHandler(BaseHTTPRequestHandler):
         if length > max_body_bytes:
             # 본문을 읽지 않고 거절하므로 연결을 닫아 남은 데이터가 다음 요청으로 섞이지 않게 한다.
             self.close_connection = True
-            raise ApiError("BODY_TOO_LARGE", "요청 크기가 너무 큽니다.", 413)
+            raise ApiError(
+                "BODY_TOO_LARGE", "요청 크기가 너무 큽니다. 용량이 더 작은 사진으로 다시 시도해 주세요.", 413
+            )
         content_type = self.headers.get("Content-Type", "")
         if self.headers.get_content_type() != "multipart/form-data":
-            raise ApiError("INVALID_FORM", "multipart/form-data 형식으로 보내 주세요.", 415)
+            raise ApiError(
+                "INVALID_FORM", "요청 형식이 올바르지 않습니다. multipart/form-data로 보내 주세요.", 415
+            )
         return parse_form(content_type, self.rfile.read(length))
 
     def send_error_json(self, error: ApiError) -> None:
