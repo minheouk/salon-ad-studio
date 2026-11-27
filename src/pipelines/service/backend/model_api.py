@@ -154,12 +154,12 @@ class ModelAPI:
             raise invalid_response()
         return [(kind, self.download(item)) for kind, item in zip(kinds, items)]
 
-    # 단건 수정 응답은 PNG 또는 하나의 서명 URL을 사용하는 임시 형식으로 받습니다.
+    # 단건 수정 응답의 result.url로 수정본을 바로 내려받습니다.
     def edit(self, image, common_prompt, image_prompt):
         fields = {name: value for name, value in
                   (("commonPrompt", common_prompt), ("imagePrompt", image_prompt)) if value}
-        mime, content = self.post("edit", fields, [("image", "edit.png", "image/png", image)])
-        return png(content) if mime == "image/png" else self.download(decode_json(content))
+        _, content = self.post("edit", fields, [("image", "edit.png", "image/png", image)])
+        return self.download(decode_json(content).get("result"))
 
     # 선택된 이미지 순서로 하나의 게시물 문구를 요청합니다.
     def copy(self, fields, images):

@@ -62,7 +62,7 @@ python -m src.pipelines.service.backend.web --port 8509
 | `POST /copy` | 매장 정보와 선택한 PNG 파일을 게시 순서대로 전송해 캡션과 해시태그를 받습니다. |
 
 생성 응답의 서명 URL에서 PNG를 내려받아 결과를 Supabase Postgres에 저장합니다.
-현재 단건 수정 응답은 PNG 바이너리 또는 동일 출처의 다운로드 URL을 담은 JSON을 받습니다.
+이미지 수정 응답은 JSON의 `result.url`에서 동일 출처의 다운로드 URL을 읽어 수정본 PNG를 내려받습니다.
 실제 서빙 서버와 연결할 때는 최종 응답 형식과 파일 용량 제한을 서빙팀 명세에 맞춰 확인합니다.
 
 ## 채팅 보관 작업
