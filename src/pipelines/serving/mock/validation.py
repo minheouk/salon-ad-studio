@@ -62,16 +62,26 @@ def check_prompt(prompt: object, field: str = "prompt") -> str:
     return text
 
 
-def check_edit_prompts(prompts: list[str]) -> list[str]:
-    """수정 단계에서 쓴 수정 프롬프트. 수정하지 않았으면 없어도 되고, 보낸 값은 prompt와 같은 규칙으로 검사한다."""
-    return [check_prompt(prompt, field="editPrompts") for prompt in prompts]
+def check_edit_instructions(common: str | None, individual: str | None) -> str:
+    """/edit: 공통 프롬프트(commonPrompt)와 개별 프롬프트(imagePrompt) 중 하나 이상.
+
+    보낸 값은 prompt와 같은 규칙으로 검사한다. 둘 다 없으면 commonPrompt가 비었다고 알린다.
+    """
+    sent = {
+        name: value
+        for name, value in (("commonPrompt", common), ("imagePrompt", individual))
+        if value is not None
+    }
+    if not sent:
+        raise ApiError("EMPTY_PROMPT", "요청 내용을 입력해 주세요.", field="commonPrompt")
+    return " ".join(check_prompt(value, field=name) for name, value in sent.items())
 
 
-def check_photos(photos: list[bytes]) -> list[Photo]:
-    """/generate: 네일 팁 세트 사진 정확히 1장."""
+def check_photos(photos: list[bytes], field: str = "images") -> list[Photo]:
+    """/generate·/edit: 이미지 정확히 1장. field는 사진을 받은 요청 필드 이름(/generate는 images, /edit은 image)."""
     if len(photos) != MAX_PHOTOS:
-        raise ApiError("PHOTO_COUNT", f"사진은 {MAX_PHOTOS}장만 올릴 수 있습니다.", field="images")
-    return [check_photo(photo, number) for number, photo in enumerate(photos, start=1)]
+        raise ApiError("PHOTO_COUNT", f"사진은 {MAX_PHOTOS}장만 올릴 수 있습니다.", field=field)
+    return [check_photo(photo, number, field) for number, photo in enumerate(photos, start=1)]
 
 
 def check_copy_images(images: list[bytes]) -> list[Photo]:
@@ -83,13 +93,13 @@ def check_copy_images(images: list[bytes]) -> list[Photo]:
     return [check_photo(image, number) for number, image in enumerate(images, start=1)]
 
 
-def check_photo(data: bytes, number: int) -> Photo:
+def check_photo(data: bytes, number: int, field: str = "images") -> Photo:
     """파일 내용으로 형식을 판별한다. 파일 이름이나 Content-Type 표기는 믿지 않는다."""
     if len(data) > MAX_FILE_BYTES:
         raise ApiError(
             "FILE_TOO_LARGE",
             f"{number}번째 사진이 {MAX_FILE_BYTES // (1024 * 1024)}MB를 넘습니다.",
-            field="images",
+            field=field,
         )
     if data.startswith(PNG_SIGNATURE):
         fmt, size = "png", read_png_size(data)
@@ -99,16 +109,16 @@ def check_photo(data: bytes, number: int) -> Photo:
         raise ApiError(
             "UNSUPPORTED_FORMAT",
             f"{number}번째 사진은 PNG 또는 JPG 파일만 올릴 수 있습니다.",
-            field="images",
+            field=field,
         )
     if size is None:
         raise ApiError(
             "BROKEN_IMAGE",
             f"{number}번째 사진 파일이 손상되었습니다. 다른 사진을 올려 주세요.",
-            field="images",
+            field=field,
         )
     photo = Photo(fmt, *size)
-    check_resolution(photo, number)
+    check_resolution(photo, number, field)
     return photo
 
 
@@ -150,16 +160,16 @@ def read_jpeg_size(data: bytes) -> tuple[int, int] | None:
     return None
 
 
-def check_resolution(photo: Photo, number: int) -> None:
+def check_resolution(photo: Photo, number: int, field: str = "images") -> None:
     if min(photo.width, photo.height) < MIN_SIDE:
         raise ApiError(
             "RESOLUTION_TOO_LOW",
             f"{number}번째 사진의 해상도가 너무 낮습니다. 짧은 변이 {MIN_SIDE}px 이상인 사진을 올려 주세요.",
-            field="images",
+            field=field,
         )
     if max(photo.width, photo.height) > MAX_SIDE:
         raise ApiError(
             "RESOLUTION_TOO_HIGH",
             f"{number}번째 사진의 해상도가 너무 높습니다. 긴 변이 {MAX_SIDE}px 이하인 사진을 올려 주세요.",
-            field="images",
+            field=field,
         )

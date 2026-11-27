@@ -25,7 +25,7 @@ from src.pipelines.serving.mock.validation import (
     MAX_PHOTOS,
     ApiError,
     check_copy_images,
-    check_edit_prompts,
+    check_edit_instructions,
     check_photos,
     check_prompt,
 )
@@ -33,9 +33,12 @@ from src.pipelines.serving.mock.validation import (
 # 외부에 포트를 열지 않는다. VM에서는 SSH 포트 전달로만 접속한다.
 HOST = "127.0.0.1"
 # 주소 -> 생성 종류.
-# /generate: 네일 팁 세트 사진 1장으로 이미지를 만든다. 결과 수정 단계도 이미지만 다룬다.
+# /generate: 네일 팁 세트 사진 1장으로 이미지를 만든다.
+# /edit: 결과 수정 단계. 이미지 1장을 받아 수정본 1장을 만든다. 문구는 만들지 않는다.
 # /copy: 이미지를 다 고른 뒤 게시 미리보기에서 따로 부른다. 최종 이미지 여러 장으로 문구를 만든다.
-GENERATE_ROUTES = {"/generate": generation.IMAGES, "/copy": generation.COPY}
+GENERATE_ROUTES = {"/generate": generation.IMAGES, "/edit": generation.EDIT, "/copy": generation.COPY}
+# 파일로 받는 요청 필드. /generate·/copy는 images, /edit은 수정할 이미지 1장을 image로 받는다.
+FILE_FIELDS = ("images", "image")
 # 웹 백엔드가 채팅에 저장해 둔 매장 정보. /copy는 이 값을 게시글 본문에 넣는다.
 STORE_FIELDS = ("shop", "instagramId", "businessHours", "booking")
 # 이미지 최대 장수 × 최대 크기에, 텍스트 필드와 multipart 경계 문자열 몫으로 1MB를 더한다.
@@ -43,6 +46,7 @@ STORE_FIELDS = ("shop", "instagramId", "businessHours", "booking")
 EXTRA_BODY_BYTES = 1024 * 1024
 MAX_BODY_BYTES = {
     generation.IMAGES: MAX_PHOTOS * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
+    generation.EDIT: MAX_PHOTOS * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
     generation.COPY: MAX_COPY_IMAGES * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
 }
 QUEUE_FULL_RETRY_AFTER_SECONDS = 10
@@ -59,29 +63,55 @@ def mock_outcome(prompt: str) -> str:
     return generation.SUCCEEDED
 
 
-def parse_form(content_type: str, body: bytes) -> tuple[dict[str, list[str]], list[bytes]]:
-    """multipart/form-data 본문을 텍스트 필드와 images 파일 목록으로 나눈다.
+def parse_form(content_type: str, body: bytes) -> tuple[dict[str, list[str]], dict[str, list[bytes]]]:
+    """multipart/form-data 본문을 텍스트 필드와 파일 필드(images, image)로 나눈다.
 
-    같은 이름이 여러 번 올 수 있어서(editPrompts) 텍스트 필드는 값 목록으로 모은다. images는 보낸 순서를 지킨다.
+    같은 이름이 여러 번 올 수 있어서(images) 값은 목록으로 모은다. 파일은 보낸 순서를 지킨다.
     """
     message = BytesParser(policy=policy.HTTP).parsebytes(
         f"Content-Type: {content_type}\r\n\r\n".encode() + body
     )
     fields: dict[str, list[str]] = {}
-    images: list[bytes] = []
+    files: dict[str, list[bytes]] = {}
     for part in message.iter_parts():
         name = part.get_param("name", header="content-disposition")
         data = part.get_payload(decode=True) or b""
-        if name == "images":
-            images.append(data)
+        if name in FILE_FIELDS:
+            files.setdefault(name, []).append(data)
         elif name:
             fields.setdefault(name, []).append(data.decode("utf-8", errors="replace"))
-    return fields, images
+    return fields, files
 
 
 def last_value(fields: dict[str, list[str]], name: str) -> str | None:
     values = fields.get(name)
     return values[-1] if values else None
+
+
+def check_generate_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]) -> str:
+    check_photos(files.get("images", []))
+    return check_prompt(last_value(fields, "prompt"))
+
+
+def check_edit_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]) -> str:
+    # 수정할 이미지 1장(image)과, 공통 프롬프트(commonPrompt)·개별 프롬프트(imagePrompt) 중 하나 이상을 받는다.
+    check_photos(files.get("image", []), field="image")
+    return check_edit_instructions(last_value(fields, "commonPrompt"), last_value(fields, "imagePrompt"))
+
+
+def check_copy_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]) -> str:
+    # 게시할 최종 이미지와 매장 정보만 받는다. 프롬프트는 받지 않으므로 검사하지 않는다.
+    check_copy_images(files.get("images", []))
+    # 목업 전용: 실패 화면을 시험할 때만 prompt에 [mock:...] 표시를 넣어 보낼 수 있다.
+    return last_value(fields, "prompt") or ""
+
+
+# 생성 종류 -> 입력 검사. 검사를 통과하면 목업 표시([mock:...])를 찾을 프롬프트를 돌려준다.
+INPUT_CHECKS = {
+    generation.IMAGES: check_generate_input,
+    generation.EDIT: check_edit_input,
+    generation.COPY: check_copy_input,
+}
 
 
 def ms_between(start: float, end: float) -> int:
@@ -96,6 +126,15 @@ def generation_view(done: generation.Generation) -> dict:
     }
     if done.copy is not None:
         return {"timing_ms": timing, **done.copy}
+    expires_in = round(done.finished_wall_time + generation.RESULT_TTL_SECONDS - time.time())
+    if done.kind == generation.EDIT:
+        # 수정본은 1장이라 목록 대신 result 하나로 준다. 종류(type)는 보낸 쪽이 알고 있어서 넣지 않는다.
+        return {
+            "generation_id": done.id,
+            "timing_ms": timing,
+            "result": {"url": signed_url(f"/api/results/{done.id}/1")},
+            "results_expire_in_seconds": expires_in,
+        }
     return {
         "generation_id": done.id,
         "timing_ms": timing,
@@ -103,9 +142,7 @@ def generation_view(done: generation.Generation) -> dict:
             {"type": result["type"], "url": signed_url(f"/api/results/{done.id}/{number}")}
             for number, result in enumerate(done.results, start=1)
         ],
-        "results_expire_in_seconds": round(
-            done.finished_wall_time + generation.RESULT_TTL_SECONDS - time.time()
-        ),
+        "results_expire_in_seconds": expires_in,
     }
 
 
@@ -133,29 +170,27 @@ class MockHandler(BaseHTTPRequestHandler):
             self.send_error_json(error)
 
     def generate(self, kind: str) -> generation.Generation:
-        fields, images = self.read_form(MAX_BODY_BYTES[kind])
+        fields, files = self.read_form(MAX_BODY_BYTES[kind])
         # 처리 시간은 요청 본문을 다 받은 뒤부터 잰다. 업로드 시간은 넣지 않는다.
         received_at = time.monotonic()
-        if kind == generation.COPY:
-            # 게시할 최종 이미지 여러 장과, 최초 프롬프트에 더해 수정 단계의 수정 프롬프트도 받는다.
-            check_copy_images(images)
-            check_edit_prompts(fields.get("editPrompts", []))
-        else:
-            check_photos(images)
-        prompt = check_prompt(last_value(fields, "prompt"))
+        prompt = INPUT_CHECKS[kind](fields, files)
         # 매장 정보 형식 검사는 웹 백엔드가 한다. 목업은 받은 값을 그대로 쓴다.
         store = {name: last_value(fields, name) or "" for name in STORE_FIELDS}
         return self.generator.generate(kind, mock_outcome(prompt), received_at, store)
 
-    def read_form(self, max_body_bytes: int) -> tuple[dict[str, list[str]], list[bytes]]:
+    def read_form(self, max_body_bytes: int) -> tuple[dict[str, list[str]], dict[str, list[bytes]]]:
         length = int(self.headers.get("Content-Length") or 0)
         if length > max_body_bytes:
             # 본문을 읽지 않고 거절하므로 연결을 닫아 남은 데이터가 다음 요청으로 섞이지 않게 한다.
             self.close_connection = True
-            raise ApiError("BODY_TOO_LARGE", "요청 크기가 너무 큽니다.", 413)
+            raise ApiError(
+                "BODY_TOO_LARGE", "요청 크기가 너무 큽니다. 용량이 더 작은 사진으로 다시 시도해 주세요.", 413
+            )
         content_type = self.headers.get("Content-Type", "")
         if self.headers.get_content_type() != "multipart/form-data":
-            raise ApiError("INVALID_FORM", "multipart/form-data 형식으로 보내 주세요.", 415)
+            raise ApiError(
+                "INVALID_FORM", "요청 형식이 올바르지 않습니다. multipart/form-data로 보내 주세요.", 415
+            )
         return parse_form(content_type, self.rfile.read(length))
 
     def send_error_json(self, error: ApiError) -> None:
