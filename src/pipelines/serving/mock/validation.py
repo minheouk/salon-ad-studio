@@ -62,11 +62,6 @@ def check_prompt(prompt: object, field: str = "prompt") -> str:
     return text
 
 
-def check_edit_prompts(prompts: list[str]) -> list[str]:
-    """수정 단계에서 쓴 수정 프롬프트. 수정하지 않았으면 없어도 되고, 보낸 값은 prompt와 같은 규칙으로 검사한다."""
-    return [check_prompt(prompt, field="editPrompts") for prompt in prompts]
-
-
 def check_edit_instructions(common: str | None, individual: str | None) -> str:
     """/edit: 공통 프롬프트(commonPrompt)와 개별 프롬프트(imagePrompt) 중 하나 이상.
 

@@ -43,7 +43,7 @@ def api(server_url, monkeypatch):
 def encode_form(
     fields: list[tuple[str, str]], images: list[bytes], file_field: str = "images"
 ) -> tuple[bytes, str]:
-    """같은 이름의 필드(editPrompts)를 여러 번 보낼 수 있도록 (이름, 값) 목록을 받는다.
+    """같은 이름의 필드를 여러 번 보낼 수 있도록 (이름, 값) 목록을 받는다.
 
     file_field는 이미지를 담을 요청 필드 이름이다. /edit은 image를 쓴다.
     """
@@ -71,17 +71,18 @@ def request(url: str, data: bytes | None = None, headers: dict | None = None):
         return error.code, error.headers, error.read()
 
 
-def generate(
-    api: str,
-    prompt: str = PROMPT,
-    images: list[bytes] | None = None,
-    path: str = "/generate",
-    edit_prompts: tuple[str, ...] = (),
-):
+def generate(api: str, prompt: str = PROMPT, images: list[bytes] | None = None, path: str = "/generate"):
     images = [make_png(1024, 1024)] if images is None else images
-    fields = [*STORE_FIELDS.items(), ("prompt", prompt), *(("editPrompts", text) for text in edit_prompts)]
-    body, content_type = encode_form(fields, images)
+    body, content_type = encode_form([*STORE_FIELDS.items(), ("prompt", prompt)], images)
     status, headers, raw = request(api + path, body, {"Content-Type": content_type})
+    return status, headers, json.loads(raw)
+
+
+def copy(api: str, images: list[bytes] | None = None):
+    """웹 백엔드처럼 매장 정보와 게시할 이미지만 보낸다. 프롬프트는 보내지 않는다."""
+    images = [make_png(1024, 1024)] if images is None else images
+    body, content_type = encode_form(list(STORE_FIELDS.items()), images)
+    status, headers, raw = request(api + "/copy", body, {"Content-Type": content_type})
     return status, headers, json.loads(raw)
 
 
@@ -119,42 +120,37 @@ def test_invalid_input_is_rejected_with_400_and_field(api, prompt, images, code,
     assert (status, body["error"]["code"], body["error"]["field"]) == (400, code, field)
 
 
-@pytest.mark.parametrize("path", ["/generate", "/copy"])
-def test_200_char_prompt_is_accepted(api, path):
-    assert generate(api, "가" * 200 + " ", path=path)[0] == 200
+def test_200_char_prompt_is_accepted(api):
+    assert generate(api, "가" * 200 + " ")[0] == 200
 
 
-@pytest.mark.parametrize("path", ["/generate", "/copy"])
 @pytest.mark.parametrize("prompt", ["", "   "])
-def test_empty_prompt_is_rejected(api, path, prompt):
-    status, _, body = generate(api, prompt, path=path)
+def test_generate_still_requires_prompt(api, prompt):
+    status, _, body = generate(api, prompt)
     assert (status, body["error"]["code"], body["error"]["field"]) == (400, "EMPTY_PROMPT", "prompt")
 
 
-def test_copy_accepts_several_final_images_and_edit_prompts(api):
-    final_images = [make_png(1024, 1024)] * 3
-    status, _, body = generate(
-        api, path="/copy", images=final_images, edit_prompts=("배경을 더 밝게 바꿔 주세요.",)
-    )
+def test_copy_works_without_prompt(api):
+    status, _, body = copy(api, images=[make_png(1024, 1024)] * 3)
     assert status == 200
     assert set(body) == {"timing_ms", "caption", "hashtags"}
 
 
+@pytest.mark.parametrize("prompt", ["", "   ", "가" * 201])
+def test_copy_does_not_check_prompt_even_if_sent(api, prompt):
+    assert generate(api, prompt, path="/copy")[0] == 200
+
+
 def test_copy_caption_includes_all_store_fields(api):
-    caption = generate(api, path="/copy")[2]["caption"]
+    caption = copy(api)[2]["caption"]
     for value in STORE_FIELDS.values():
         assert value in caption
 
 
 @pytest.mark.parametrize("count", [0, 14])
 def test_copy_rejects_wrong_image_count(api, count):
-    status, _, body = generate(api, path="/copy", images=[make_png(1024, 1024)] * count)
+    status, _, body = copy(api, images=[make_png(1024, 1024)] * count)
     assert (status, body["error"]["code"], body["error"]["field"]) == (400, "PHOTO_COUNT", "images")
-
-
-def test_copy_rejects_empty_edit_prompt(api):
-    status, _, body = generate(api, path="/copy", edit_prompts=(" ",))
-    assert (status, body["error"]["code"], body["error"]["field"]) == (400, "EMPTY_PROMPT", "editPrompts")
 
 
 def test_edit_returns_one_downloadable_result(api):

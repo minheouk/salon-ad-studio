@@ -126,8 +126,9 @@ curl -X POST http://127.0.0.1:8004/generate \
 
 - 60초를 기다리지 않도록, 다른 요청처럼 **3초 뒤에** 응답합니다.
 - `/generate`, `/edit`, `/copy` 모두 됩니다. `/edit`은 `commonPrompt`와 `imagePrompt` 어느 쪽에 넣어도 됩니다.
+- `/copy`는 원래 프롬프트를 받지 않지만, 실패 화면을 시험할 때만 `prompt` 필드에 표시를 넣어 보낼 수 있습니다. 예: `-F "prompt=[mock:failed]"`
 - 실패 문구는 `/edit`이 `광고를 수정하지 못했습니다. 다시 시도해 주세요.`, `/copy`가 `광고 문구를 만들지 못했습니다. 다시 시도해 주세요.`입니다.
-- 표시도 200자 제한에 포함됩니다.
+- `/generate`·`/edit`에서는 표시도 200자 제한에 포함됩니다.
 - **목업 전용 기능입니다.** 실제 서빙 API에는 넣지 않습니다.
 
 ### 처리 시간 (`timing_ms`)
@@ -186,7 +187,7 @@ curl -X POST http://127.0.0.1:8004/edit \
 ## 광고 문구 생성: `POST /copy`
 
 API 명세의 AI-03입니다. **게시 미리보기에서** 웹 백엔드가 부릅니다.
-원본 사진이 아니라, 사용자가 **실제로 게시할 최종 이미지 파일만 게시 순서대로** 한 요청에 담아 보냅니다.
+원본 사진이 아니라, 사용자가 **실제로 게시할 최종 이미지 파일과 매장 정보만** 한 요청에 담아 보냅니다. **프롬프트는 보내지 않습니다.**
 
 ```sh
 curl -X POST http://127.0.0.1:8004/copy \
@@ -194,19 +195,17 @@ curl -X POST http://127.0.0.1:8004/copy \
   -F "instagramId=ora_nail" \
   -F "businessHours=화~일 11:00–20:00 / 월 휴무" \
   -F "booking=https://example.com/reserve" \
-  -F "prompt=겨울 분위기의 12월 이달의 아트를 만들어 주세요." \
-  -F "editPrompts=배경을 더 밝게 바꿔 주세요." \
-  -F "images=@final-1.png" \
-  -F "images=@final-2.png"
+  -F "images=@nail-02.png;type=image/png" \
+  -F "images=@price-table.png;type=image/png"
 ```
 
 | 필드 | 규칙 |
 |---|---|
-| `images` | 게시할 최종 이미지, 게시 순서대로 1~13장 (임시). 장마다 PNG 또는 JPG, 10MB 이하 |
-| `prompt` | 필수. 최초 생성 프롬프트. 규칙은 `/generate`와 같습니다 |
-| `editPrompts` | 결과 수정 단계에서 쓴 수정 프롬프트. 수정한 만큼 같은 이름으로 여러 번 보냅니다. 수정하지 않았으면 보내지 않습니다. 보낸 값은 `prompt`와 같은 규칙(1~200자)으로 검사합니다 |
+| `images` | 게시할 최종 이미지, 게시 순서대로 1~13장 (임시). 같은 `images` 이름을 반복합니다. 장마다 PNG 또는 JPG, 10MB 이하 |
 | `shop`, `instagramId`, `businessHours`, `booking` | 채팅에 저장된 매장 정보. 게시글 본문(`caption`)에 모두 들어갑니다. 형식 검사는 웹 백엔드가 합니다 |
 
+- `prompt`와 `editPrompts`는 받지 않습니다. 보내도 검사하지 않고 무시합니다. 웹 백엔드(`feat/service-web-app`)의 요청에 맞춘 것입니다.
+- 캡션에는 가격을 넣지 않습니다.
 - 요청 전체 한도는 13장 × 10MB + 1MB(텍스트 여유)입니다. 장수·용량과 함께 임시 값입니다.
 
 정상 응답 (`200`). 다운로드할 파일이 없어서 문구를 응답에 바로 담습니다.
@@ -219,7 +218,7 @@ curl -X POST http://127.0.0.1:8004/copy \
 }
 ```
 
-오류 응답 형식은 `POST /generate`와 같습니다. 이미지 장수가 1~13장이 아니면 `400 PHOTO_COUNT`, 수정 프롬프트가 비어 있으면 `400 EMPTY_PROMPT`(`field`: `editPrompts`)입니다.
+오류 응답 형식은 `POST /generate`와 같습니다. 이미지 장수가 1~13장이 아니면 `400 PHOTO_COUNT`(`field`: `images`)입니다.
 
 ## 시간 초과
 
@@ -258,7 +257,7 @@ Retry-After: 10
 
 실패하면 HTTP 상태 번호와 함께 `error` 안에 `code`, `field`, `message`를 돌려줍니다. 웹 탭(WEB-xx)의 오류 형식과 같습니다.
 - 웹에서는 **HTTP 상태 번호로 입력 오류(4xx)인지 판단**하고, `code`로 분기합니다.
-- `field`는 문제가 된 요청 필드 이름(`images`, `image`, `prompt`, `commonPrompt`, `imagePrompt`, `editPrompts`)입니다. 필드와 관계없는 오류는 `null`입니다.
+- `field`는 문제가 된 요청 필드 이름(`images`, `image`, `prompt`, `commonPrompt`, `imagePrompt`)입니다. 필드와 관계없는 오류는 `null`입니다.
 - `message`는 사용자에게 그대로 보여 주면 됩니다.
 
 ```json
@@ -269,8 +268,8 @@ Retry-After: 10
 
 | HTTP | `code` | `field` | 언제 |
 |---|---|---|---|
-| 400 | `EMPTY_PROMPT` | `prompt`, `commonPrompt`, `imagePrompt`, `editPrompts` | 앞뒤 공백을 빼면 비어 있음. `/edit`은 두 프롬프트가 모두 없을 때도 |
-| 400 | `PROMPT_TOO_LONG` | `prompt`, `commonPrompt`, `imagePrompt`, `editPrompts` | 요청 내용이 200자를 넘음 |
+| 400 | `EMPTY_PROMPT` | `prompt`, `commonPrompt`, `imagePrompt` | 앞뒤 공백을 빼면 비어 있음. `/edit`은 두 프롬프트가 모두 없을 때도 |
+| 400 | `PROMPT_TOO_LONG` | `prompt`, `commonPrompt`, `imagePrompt` | 요청 내용이 200자를 넘음 |
 | 400 | `PHOTO_COUNT` | `images` (`/edit`은 `image`) | `/generate`·`/edit`: 이미지가 1장이 아님 / `/copy`: 이미지가 1~13장이 아님 |
 | 400 | `UNSUPPORTED_FORMAT` | `images` (`/edit`은 `image`) | 파일 내용이 PNG·JPG가 아님 |
 | 400 | `FILE_TOO_LARGE` | `images` (`/edit`은 `image`) | 사진 한 장이 10MB를 넘음 |
@@ -309,7 +308,7 @@ Retry-After: 10
 ## 정해지지 않은 것
 
 - **요청 전체 최대 용량**: `/generate`는 사진 1장 10MB를 기준으로 임시로 정했습니다.
-- **`/copy` 요청 형식**: 이미지 필드 이름(`images`), 최대 장수(13장), 장당·전체 용량, 전송 형식(`multipart/form-data`), 수정 프롬프트 필드 이름(`editPrompts`)은 모두 임시입니다. 최종 작업 후 서비스팀과 맞춥니다.
+- **`/copy` 요청 형식**: 이미지 필드 이름(`images`), 최대 장수(13장), 장당·전체 용량, 전송 형식(`multipart/form-data`)은 모두 임시입니다. 최종 작업 후 서비스팀과 맞춥니다.
 - **결과 이미지 ID**: `results[]`에 넣을 이미지 ID의 필드 이름과 형식은 아직 정해지지 않아 목업에 넣지 않았습니다.
 - **네일 팁 이미지 수**: 실제 모델이 몇 장(최대 12장)을 만들지 정해지면 맞춥니다. 목업은 항상 12장입니다.
 - **대기 가능한 요청 수**: 처리 중 1개와 대기 2개는 임시로 정한 값입니다.

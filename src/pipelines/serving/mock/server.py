@@ -26,7 +26,6 @@ from src.pipelines.serving.mock.validation import (
     ApiError,
     check_copy_images,
     check_edit_instructions,
-    check_edit_prompts,
     check_photos,
     check_prompt,
 )
@@ -67,7 +66,7 @@ def mock_outcome(prompt: str) -> str:
 def parse_form(content_type: str, body: bytes) -> tuple[dict[str, list[str]], dict[str, list[bytes]]]:
     """multipart/form-data 본문을 텍스트 필드와 파일 필드(images, image)로 나눈다.
 
-    같은 이름이 여러 번 올 수 있어서(editPrompts, images) 값은 목록으로 모은다. 파일은 보낸 순서를 지킨다.
+    같은 이름이 여러 번 올 수 있어서(images) 값은 목록으로 모은다. 파일은 보낸 순서를 지킨다.
     """
     message = BytesParser(policy=policy.HTTP).parsebytes(
         f"Content-Type: {content_type}\r\n\r\n".encode() + body
@@ -101,10 +100,10 @@ def check_edit_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]
 
 
 def check_copy_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]) -> str:
-    # 게시할 최종 이미지 여러 장과, 최초 프롬프트에 더해 수정 단계의 수정 프롬프트도 받는다.
+    # 게시할 최종 이미지와 매장 정보만 받는다. 프롬프트는 받지 않으므로 검사하지 않는다.
     check_copy_images(files.get("images", []))
-    check_edit_prompts(fields.get("editPrompts", []))
-    return check_prompt(last_value(fields, "prompt"))
+    # 목업 전용: 실패 화면을 시험할 때만 prompt에 [mock:...] 표시를 넣어 보낼 수 있다.
+    return last_value(fields, "prompt") or ""
 
 
 # 생성 종류 -> 입력 검사. 검사를 통과하면 목업 표시([mock:...])를 찾을 프롬프트를 돌려준다.
