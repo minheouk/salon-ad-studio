@@ -441,10 +441,9 @@ class WebHandler(SimpleHTTPRequestHandler):
             except ModelError as error:
                 if error.status == HTTPStatus.TOO_MANY_REQUESTS:
                     queue_error = error
-                results.append({"image_id": target[0], "error": {
-                    "code": error.code, "message": str(error), "status": error.status,
-                    "retry_after": error.retry_after,
-                }})
+                body = ApiError(error.code, str(error), error.status, field=error.field).body
+                body.update(status=error.status, retry_after=error.retry_after)
+                results.append({"image_id": target[0], "error": body})
         return results
 
     # 최신 결과 네일팁의 파일과 각 프롬프트를 그대로 전달합니다.
@@ -504,7 +503,8 @@ class WebHandler(SimpleHTTPRequestHandler):
         except ApiError as error:
             self.reply_error(error)
         except ModelError as error:
-            self.reply_error(ApiError(error.code, str(error), error.status, retry_after=error.retry_after))
+            self.reply_error(ApiError(error.code, str(error), error.status, field=error.field,
+                                      retry_after=error.retry_after))
         except AuthError as error:
             self.reply_error(ApiError("AUTH_ERROR", str(error), error.status))
         except psycopg.OperationalError:

@@ -17,11 +17,12 @@ class ModelError(Exception):
     """모델 서버 오류를 웹 응답으로 전달하는 데 필요한 정보를 보관합니다."""
 
     # 모델 서버 오류에 웹 API로 전달할 코드와 대기 시간을 보관합니다.
-    def __init__(self, code, message, status=HTTPStatus.BAD_GATEWAY, retry_after=None):
+    def __init__(self, code, message, status=HTTPStatus.BAD_GATEWAY, retry_after=None, *, field=None):
         super().__init__(message)
         self.code = code
         self.status = status
         self.retry_after = retry_after
+        self.field = field
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -56,20 +57,23 @@ def invalid_response():
 def response_error(error):
     try:
         data = json.loads(error.read(MAX_JSON_BYTES))
-        data = data if isinstance(data, dict) else {}
+        data = data.get("error") if isinstance(data, dict) else None
     except (ValueError, OSError):
         data = {}
     if error.code == 504:
         return ModelError("GENERATION_TIMEOUT", "요청 시간이 초과됐습니다. 다시 시도해 주세요.", 504)
     if not 400 <= error.code <= 599:
         return invalid_response()
+    data = data if isinstance(data, dict) else {}
     message = data.get("message")
+    field = data.get("field")
     code = data.get("code")
     return ModelError(
         code if isinstance(code, str) else "MODEL_REQUEST_FAILED",
         message if isinstance(message, str) else "모델 요청에 실패했습니다. 다시 시도해 주세요.",
         error.code,
         error.headers.get("Retry-After") if error.code == 429 else None,
+        field=field if isinstance(field, str) and field else None,
     )
 
 
