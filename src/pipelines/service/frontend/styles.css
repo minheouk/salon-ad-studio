@@ -1,0 +1,359 @@
+/* 화면 전체가 공유하는 색상, 배경, 글꼴을 설정합니다. */
+:root {
+  color-scheme: light;
+  font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color: #211c27;
+  background: #faf9fc;
+  --muted: #615b69;
+  --line: #ded9e4;
+  --accent: #6947b5;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+/* 페이지의 기본 여백, 배경, 키보드 포커스 표시를 설정합니다. */
+body {
+  margin: 0;
+  background: radial-gradient(ellipse 650px 360px at 50% 140px, #f1ebfc, transparent 100%), #faf9fc;
+}
+button { font: inherit; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+
+/* 랜딩 첫 화면의 높이와 상단 메뉴의 배치를 설정합니다. */
+.first-screen {
+  min-height: 100svh;
+}
+
+.site-header {
+  max-width: 1220px;
+  margin: auto;
+  padding: 18px clamp(16px, 5vw, 56px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 서비스 로고와 이름의 정렬, 글자 모양, 브랜드 색상을 설정합니다. */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.14rem;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand-mark { color: var(--accent); }
+.site-header nav { display: flex; gap: 8px; }
+
+/* 공통 버튼의 크기와 정렬, 종류별 색상과 호버 상태를 설정합니다. */
+.button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 15px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: .9rem;
+  font-weight: 750;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.button-plain { background: transparent; color: inherit; }
+.button-plain:hover, .button-outline:hover { background: #eee8f6; }
+.button-outline { border-color: var(--line); background: #fff; color: inherit; }
+.button-primary { background: #292033; color: #fff; padding: 12px 19px; }
+.button-primary:hover { background: #49385a; }
+
+/* 랜딩의 핵심 메시지와 주요 행동 버튼 영역을 배치합니다. */
+.hero {
+  width: min(100% - 32px, 960px);
+  margin: auto;
+  padding: clamp(12px, 4vh, 48px) 0 26px;
+  text-align: center;
+}
+
+h1, h2, p, figure { margin: 0; }
+.hero h1 { font-size: clamp(2.55rem, 7vw, 5rem); line-height: 1.08; letter-spacing: -.075em; }
+.hero h1 span { color: var(--accent); }
+.hero p { margin: 14px 0 18px; color: var(--muted); line-height: 1.55; }
+
+/* 실사용 영상 프레임과 제목 표시줄을 꾸밉니다. */
+.demo {
+  width: min(100%, 720px, 88vh);
+  margin: clamp(16px, 3vh, 32px) auto 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 14px 34px #35264e12;
+}
+
+.demo figcaption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.demo figcaption span { width: 7px; height: 7px; border-radius: 50%; background: #a28dbb; }
+.demo video, .demo-placeholder { display: block; width: 100%; aspect-ratio: 16 / 9; }
+
+/* 영상 준비 중 표시와 재생 아이콘을 중앙에 배치합니다. */
+.demo-placeholder {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  background: linear-gradient(140deg, #f4eff9, #eae4f0);
+  color: var(--muted);
+  font-size: clamp(.74rem, 2.2vw, .9rem);
+}
+
+.demo-placeholder strong { color: #382d45; }
+.play-mark { display: grid; place-items: center; width: 48px; height: 42px; background: #fff; border-radius: 11px; color: var(--accent); }
+
+/* 랜딩 갤러리의 너비와 카드 그리드, 이미지 비율을 설정합니다. */
+.gallery-inner { max-width: 1050px; margin: auto; padding: clamp(36px, 7vw, 74px) clamp(16px, 4vw, 32px); }
+.gallery h2 { font-size: clamp(1.65rem, 4vw, 2.45rem); letter-spacing: -.05em; }
+.gallery p { margin: 8px 0 24px; color: var(--muted); }
+.gallery-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.gallery-grid figure { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
+.gallery-grid figcaption { display: flex; justify-content: space-between; gap: 8px; padding: 12px; font-size: .9rem; font-weight: 700; }
+.gallery-grid figcaption span { color: var(--muted); font-weight: 400; }
+.gallery-grid img, .image-placeholder { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+/* 가격표와 네일팁의 예시 이미지가 들어갈 자리를 꾸밉니다. */
+.image-placeholder { display: grid; place-items: center; background: #f1ecf5; }
+.image-placeholder i { display: block; width: 42%; height: 49%; border: 1px solid #bcb0c7; border-radius: 8px; background: #faf7fc; }
+.price-preview i { background: repeating-linear-gradient(#faf7fc 0 17%, #ded5e7 17% 20%); }
+.nail-preview i { width: 33%; height: 57%; border-radius: 48% 48% 35% 35%; transform: rotate(-22deg); }
+.alternate { background: #eee8e9; }
+.alternate i { transform: rotate(22deg); }
+
+/* 인증 팝업과 배경 오버레이의 크기, 모양, 스크롤 동작을 설정합니다. */
+.auth-dialog {
+  position: fixed;
+  width: min(100% - 32px, 400px);
+  max-height: calc(100dvh - 32px);
+  padding: 36px 28px 28px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #faf9fc;
+  color: #211c27;
+  box-shadow: 0 24px 80px #1a11234d;
+}
+
+.auth-dialog::backdrop {
+  background: #21182bc7;
+  backdrop-filter: blur(6px);
+}
+
+body:has(.auth-dialog[open]) { overflow: hidden; }
+.auth-dialog h2 { margin-bottom: 24px; text-align: center; font-size: 1.55rem; }
+
+/* 인증 팝업의 닫기 버튼을 배치하고 기본 제출 버튼의 너비를 맞춥니다. */
+.auth-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.auth-close:hover { background: #eee8f6; }
+.auth-action { width: 100%; }
+
+/* 인증 입력 필드와 상태 안내 문구를 정렬합니다. */
+.auth-email { display: grid; gap: 9px; }
+.auth-email label { font-size: .88rem; font-weight: 700; }
+.auth-email input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.auth-status { color: var(--muted); font-size: .85rem; }
+.auth-status:not(:empty) { margin-top: 12px; }
+
+/* 좁은 화면에서 랜딩의 메뉴와 콘텐츠 여백을 조정합니다. */
+@media (max-width: 580px) {
+  .site-header nav { gap: 3px; }
+  .site-header .button { padding-inline: 9px; }
+  .hero { padding-top: 32px; }
+  .desktop-break { display: none; }
+  .gallery-grid { gap: 8px; }
+  .gallery-grid figcaption { flex-wrap: wrap; padding: 8px; font-size: .76rem; }
+}
+
+/* 숨김 상태인 요소와 비활성 버튼이 각각의 상태를 드러내게 합니다. */
+[hidden] { display: none !important; }
+.button:disabled { cursor: default; opacity: .65; }
+
+/* 광고 생성과 마이페이지에서 사용하는 사이드바와 본문을 배치합니다. */
+.create-layout {
+  display: grid;
+  grid-template-columns: 175px minmax(0, 760px);
+  gap: clamp(16px, 4vw, 48px);
+  align-items: stretch;
+  max-width: 1100px;
+  margin: auto;
+  padding: clamp(16px, 4vw, 40px);
+}
+
+.create-sidebar, .create-main {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.create-sidebar { padding: 16px 12px; }
+.create-sidebar nav { display: grid; gap: 4px; margin-top: 14px; }
+.create-sidebar nav .button { justify-content: flex-start; }
+.create-main { min-width: 0; padding: clamp(16px, 4vw, 28px); }
+.create-main h1 {
+  margin: 0 0 20px;
+  font-size: clamp(1.7rem, 5vw, 2.6rem);
+  letter-spacing: -.06em;
+}
+
+/* 광고 생성 양식과 입력 항목 간격을 설정합니다. */
+.create-form { display: grid; gap: 22px; }
+.create-field { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.create-field > label:not(.photo-drop), .shop-fields legend { font-weight: 760; }
+
+/* 사진 첨부 영역, 드래그 상태, 첨부 미리보기와 오류를 표시합니다. */
+.photo-drop {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 17px 12px;
+  border: 1px dashed #a997c3;
+  border-radius: 10px;
+  background: #f8f4fc;
+  text-align: center;
+  cursor: pointer;
+}
+
+.photo-drop:hover, .photo-drop.is-dragging { background: #eee5fa; }
+.photo-drop:focus-within { outline: 3px solid var(--accent); outline-offset: 3px; }
+.photo-icon { color: var(--accent); font-size: 1.45rem; line-height: 1; }
+.photo-drop span:last-of-type, .prompt-meta { color: var(--muted); font-size: .82rem; }
+.photo-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.photo-preview { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.photo-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+.photo-preview span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.field-error { color: #9f2244; font-size: .85rem; }
+.field-error:empty { display: none; }
+
+/* 매장 정보 입력 그리드와 프롬프트 입력창, 실행 버튼을 정렬합니다. */
+.shop-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.shop-fields legend { margin-bottom: 10px; padding: 0; }
+.shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.shop-grid label { font-size: .87rem; }
+.create-field input:not(.photo-input), .create-field textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.create-field textarea { resize: vertical; }
+.prompt-meta, .create-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.prompt-meta output { white-space: nowrap; }
+.create-actions { justify-content: flex-end; flex-wrap: wrap; }
+
+/* 좁은 화면에서 작업 레이아웃과 카드 그리드의 열 수를 조정합니다. */
+@media (max-width: 650px) {
+  .create-layout { grid-template-columns: minmax(0, 1fr); }
+  .create-sidebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  .create-sidebar nav { display: flex; flex-wrap: wrap; margin: 0; }
+  .create-sidebar nav .button { padding-inline: 8px; }
+}
+
+/* 폭이 특히 좁은 화면에서 카드가 한 열로 배치되게 합니다. */
+@media (max-width: 390px) {
+  .shop-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 생성 결과의 제목과 이미지 카드, 개별 수정 지시를 배치합니다. */
+.result-panel { display: grid; gap: 22px; }
+.result-header { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
+.result-header h1 { margin-bottom: 5px; }
+.result-header p, .result-note { color: var(--muted); font-size: .87rem; }
+.result-grid { align-items: start; }
+.result-grid .image-placeholder { aspect-ratio: 1 / 1; }
+.result-image-edit { display: grid; gap: 8px; padding: 0 10px 10px; }
+.result-image-edit .button { white-space: normal; padding-inline: 6px; }
+.image-edit-draft { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+/* 이미지 수정 팝업의 너비와 선택 이미지 미리보기를 설정합니다. */
+.image-edit-dialog { width: min(100% - 32px, 450px); }
+.image-edit-preview { display: grid; justify-items: center; gap: 6px; margin-bottom: 16px; font-weight: 700; }
+.image-edit-preview .image-placeholder { width: 112px; aspect-ratio: 1 / 1; border-radius: 8px; }
+.image-edit-dialog .create-actions { margin-top: 8px; }
+
+/* 시험용 선택 컨트롤과 처리 상태 안내를 표시합니다. */
+.preview-control { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .82rem; }
+.preview-control select { padding: 5px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: inherit; font: inherit; }
+.preview-note, .workflow-dialog > p { color: var(--muted); font-size: .9rem; margin-bottom: 10px; }
+.preview-note:empty { display: none; }
+.status-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff3f6; border-radius: 8px; padding: 12px; font-size: .9rem; }
+/* 내보내기와 게시 미리보기 팝업의 공통 너비와 버튼 배치를 설정합니다. */
+.workflow-dialog { width: min(100% - 28px, 650px); }
+.workflow-dialog h2 { margin-bottom: 14px; text-align: left; }
+.workflow-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+/* 내보낼 이미지의 선택 여부와 게시 순번을 표시합니다. */
+.export-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.export-option { overflow: hidden; display: grid; gap: 6px; padding: 5px 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; cursor: pointer; }
+.export-option[aria-pressed="true"] { border-color: var(--accent); background: #f3edf9; }
+.selection-order { color: var(--muted); font-size: .8rem; }
+/* 게시 미리보기에서 이미지 순서와 이동 버튼을 배치합니다. */
+.publish-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0; list-style: none; }
+.publish-images li { text-align: center; }
+.publish-images li > span:not(.image-placeholder) { display: block; margin: 6px 0; font-size: .8rem; }
+.publish-images button { padding: 4px 8px; margin: 0 2px; }
+/* 게시 실패 화면에서 문구의 줄바꿈을 유지해 표시합니다. */
+#failure-caption { padding: 10px; background: #f3edf9; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+/* 마이페이지 채팅 목록과 관리 버튼, 삭제 대상 선택지를 정렬합니다. */
+.chat-list { padding: 0; list-style: none; }
+.chat-list li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line); }
+.chat-list li p { margin-top: 4px; font-size: .85rem; color: var(--muted); }
+.chat-list .workflow-actions { margin: 0; }
+.chat-limit-options { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.chat-limit-options label { display: flex; align-items: center; gap: 6px; }
+
+/* 게시글 문구 영역의 조작 버튼을 양쪽에 배치합니다. */
+.caption-actions { justify-content: space-between; margin-top: 0; }
+
+/* 결과 카드와 내보내기, 게시 미리보기의 실제 이미지 크기를 맞춥니다. */
+.result-grid .image-placeholder img,
+.export-grid .image-placeholder img,
+.publish-images .image-placeholder img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 개별 수정 팝업에서 선택 이미지가 프레임을 채우게 합니다. */
+.image-edit-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+/* 인증과 계정 메뉴 중 숨김 상태인 항목의 표시를 차단합니다. */
+.auth-email[hidden], [data-guest][hidden], [data-account][hidden] { display: none; }

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>새 광고 만들기 | 원컷 네일</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./create.js" type="module"></script>
+</head>
+<body>
+  <div class="create-layout">
+    <aside class="create-sidebar">
+      <a class="brand" href="./"><span class="brand-mark" aria-hidden="true">✳</span> 원컷 네일</a>
+      <nav aria-label="작업 메뉴">
+        <a class="button button-outline" href="./mypage.html?new" aria-current="page">새 광고 만들기</a>
+        <a class="button button-plain" href="./mypage.html">마이페이지</a>
+      </nav>
+    </aside>
+
+    <main class="create-main">
+      <h1 id="create-title">이달의 아트는 뭐예요?</h1>
+      <form class="create-form" id="create-form" novalidate>
+        <div class="create-field">
+          <label for="photo">네일 사진</label>
+          <label class="photo-drop" id="photo-drop" for="photo">
+            <span class="photo-icon" aria-hidden="true">↑</span>
+            <strong>파일을 선택하거나 여기로 끌어오세요</strong>
+            <span id="photo-guide">JPG 또는 PNG 1장 · 최대 10 MiB<br>사진 속 네일팁 세트 1~12개</span>
+            <input class="photo-input" id="photo" type="file"
+              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+              aria-describedby="photo-guide photo-error">
+          </label>
+          <div class="photo-preview" id="photo-preview" hidden>
+            <img id="photo-image" alt="첨부한 네일 사진 미리보기">
+            <span id="photo-name"></span>
+            <button class="button button-plain" id="remove-photo" type="button">사진 삭제</button>
+          </div>
+          <p class="field-error" id="photo-error" role="status"></p>
+        </div>
+
+        <fieldset class="shop-fields">
+          <legend>매장 정보</legend>
+          <div class="shop-grid">
+            <div class="create-field">
+              <label for="shop">매장명</label>
+              <input id="shop" name="shop" type="text" placeholder="예: 원컷 네일샵" required>
+            </div>
+            <div class="create-field">
+              <label for="instagramId">인스타그램 계정명</label>
+              <input id="instagramId" name="instagramId" type="text" placeholder="@ 없이 계정명 입력" required>
+            </div>
+            <div class="create-field">
+              <label for="businessHours">영업시간</label>
+              <input id="businessHours" name="businessHours" type="text"
+                placeholder="예: 화~일 11:00–20:00" required>
+            </div>
+            <div class="create-field">
+              <label for="booking">예약 링크</label>
+              <input id="booking" name="booking" type="url" inputmode="url"
+                placeholder="https://" required>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="create-field">
+          <label for="prompt">프롬프트</label>
+          <textarea id="prompt" name="prompt" rows="4" required
+            placeholder="예: 모든 디자인 39,000원" aria-describedby="prompt-guide prompt-count"></textarea>
+          <div class="prompt-meta">
+            <span id="prompt-guide">앞뒤 공백 제외 1~200자 · 가격은 프롬프트에 입력</span>
+            <output id="prompt-count" for="prompt">0 / 200자</output>
+          </div>
+        </div>
+
+        <div class="create-actions">
+          <label class="preview-control">생성 예시 상태
+            <select id="generation-example">
+              <option value="success">정상</option>
+              <option value="failed">생성 실패</option>
+              <option value="queue">대기열 초과</option>
+              <option value="timeout">시간 초과</option>
+              <option value="size">요청 크기 초과</option>
+              <option value="format">전송 오류</option>
+            </select>
+          </label>
+          <button class="button button-primary" type="submit">생성하기</button>
+        </div>
+        <div id="generation-notice" class="status-card" role="status" hidden><p></p><button class="button button-outline" type="button">다시 시도</button></div>
+        <p id="storage-notice" class="preview-note" role="status"></p>
+      </form>
+
+      <section class="result-panel" id="example-results" aria-labelledby="result-title" hidden>
+        <header class="result-header">
+          <div>
+            <h1 id="result-title" tabindex="-1">생성 결과 수정</h1>
+            <p id="result-count"></p>
+          </div>
+          <button class="button button-outline" id="back-to-inputs" type="button">입력으로 돌아가기</button>
+        </header>
+
+        <div class="gallery-grid result-grid"></div>
+
+        <div class="create-field">
+          <label for="common-edit-prompt">공통 수정 프롬프트</label>
+          <textarea id="common-edit-prompt" rows="3"
+            placeholder="예: 모든 네일팁 이미지의 배경을 밝게 바꿔 주세요."
+            aria-describedby="common-edit-guide common-edit-count"></textarea>
+          <div class="prompt-meta">
+            <span id="common-edit-guide">수정 가능한 이미지에 공통으로 적용할 내용</span>
+            <output id="common-edit-count" for="common-edit-prompt">0 / 200자</output>
+          </div>
+        </div>
+        <p class="result-note">공통 지시는 모든 네일팁에, 이미지별 지시는 해당 이미지에 적용됩니다. 두 지시가 충돌하면 이미지별 지시가 우선합니다.</p>
+        <p id="batch-edit-status" class="preview-note" role="status"></p>
+        <div class="create-actions">
+          <button class="button button-outline" id="retry-edits" type="button" hidden>실패한 이미지만 다시 시도</button>
+          <button class="button button-primary" id="apply-edits" type="button">수정 적용</button>
+        </div>
+        <div class="create-actions"><button class="button button-primary" id="open-export" type="button">내보내기</button></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="auth-dialog image-edit-dialog" id="image-edit-dialog" aria-labelledby="image-edit-title">
+    <form method="dialog">
+      <button class="auth-close" type="submit" aria-label="닫기">×</button>
+    </form>
+    <h2 id="image-edit-title">이 이미지 수정</h2>
+    <figure class="image-edit-preview">
+      <div class="image-placeholder nail-preview" id="selected-image-preview" aria-hidden="true"><i></i></div>
+      <figcaption id="selected-image-name"></figcaption>
+    </figure>
+    <form class="create-field" id="image-edit-form">
+      <label for="image-edit-prompt">이미지별 수정 프롬프트</label>
+      <textarea id="image-edit-prompt" rows="3" placeholder="예: 배경을 밝게 바꿔 주세요."
+        aria-describedby="image-edit-count"></textarea>
+      <div class="prompt-meta">
+        <span>선택한 이미지 한 장에 적용할 내용</span>
+        <output id="image-edit-count" for="image-edit-prompt">0 / 200자</output>
+      </div>
+      <div class="create-actions">
+        <button class="button button-outline" id="cancel-image-edit" type="button">취소</button>
+        <button class="button button-outline" id="save-image-prompt" type="button">프롬프트 저장</button>
+        <button class="button button-primary" type="submit">이 이미지 수정하기</button>
+      </div>
+      <p id="image-edit-status" class="preview-note" role="status"></p>
+    </form>
+  </dialog>
+  <dialog class="auth-dialog workflow-dialog" id="export-dialog" aria-labelledby="export-title">
+    <h2 id="export-title">내보낼 이미지 선택</h2>
+    <p>선택한 순서대로 게시 이미지에 배치됩니다.</p>
+    <div class="export-grid" id="export-options"></div>
+    <div class="workflow-actions">
+      <output id="export-count">선택 0장</output>
+      <button class="button button-outline" id="cancel-export" type="button">취소</button>
+      <button class="button button-primary" id="confirm-export" type="button" disabled>선택 완료</button>
+    </div>
+  </dialog>
+  <dialog class="auth-dialog workflow-dialog" id="publish-dialog" aria-labelledby="publish-title">
+    <h2 id="publish-title">인스타그램 게시 미리보기</h2>
+    <p>이미지를 끌거나 화살표 버튼으로 순서를 변경할 수 있습니다.</p>
+    <ol class="publish-images" id="publish-images"></ol>
+    <div class="create-field">
+      <label for="publish-caption">게시글 문구 · 해시태그</label>
+      <textarea id="publish-caption" rows="5" placeholder="게시글 문구와 해시태그를 입력하세요"></textarea>
+      <p id="preview-copy-status" class="preview-note" role="status"></p>
+      <div class="workflow-actions caption-actions">
+        <label class="preview-control">문구 생성 예시 상태
+          <select id="copy-example"><option value="success">정상</option><option value="failure">실패</option><option value="queue">대기열 초과</option><option value="timeout">시간 초과</option></select>
+        </label>
+        <button class="button button-outline" id="retry-copy" type="button">문구 다시 생성</button>
+      </div>
+    </div>
+    <div class="workflow-actions">
+      <label class="preview-control">게시 예시 상태
+        <select id="publish-example"><option value="success">성공</option><option value="failure">실패</option></select>
+      </label>
+      <button class="button button-outline" id="back-to-export" type="button">이미지 다시 선택</button>
+      <button class="button button-primary" id="publish" type="button">게시하기</button>
+    </div>
+  </dialog>
+  <dialog class="auth-dialog workflow-dialog" id="publish-success" aria-labelledby="publish-success-title">
+    <h2 id="publish-success-title">게시 성공했습니다.</h2>
+    <p>게시 예시 상태입니다.</p>
+    <div class="workflow-actions"><a class="button button-primary" href="./mypage.html">확인</a></div>
+  </dialog>
+  <dialog class="auth-dialog workflow-dialog" id="publish-failure" aria-labelledby="publish-failure-title">
+    <h2 id="publish-failure-title">인스타그램에 게시하지 못했습니다</h2>
+    <p>예시 이미지를 저장하거나 게시글 문구를 복사할 수 있습니다.</p>
+    <ul id="failure-images"></ul>
+    <pre id="failure-caption"></pre>
+    <p id="copy-status" role="status"></p>
+    <div class="workflow-actions">
+      <button class="button button-outline" id="back-to-preview" type="button">미리보기로 돌아가기</button>
+      <button class="button button-outline" id="copy-caption" type="button">문구 복사</button>
+      <button class="button button-primary" id="save-photos" type="button">사진 저장</button>
+    </div>
+  </dialog>
+</body>
+</html>
