@@ -12,12 +12,12 @@
 
 ## 로컬 실행
 
-저장소 루트에서 서비스 백엔드 의존성을 설치합니다.
+저장소 루트의 requirements.txt에 정의된 의존성을 설치합니다.
 
 ```sh
 python3 -m venv "$HOME/.venvs/onecut-nail"
 source "$HOME/.venvs/onecut-nail/bin/activate"
-python -m pip install -r src/pipelines/service/backend/requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 저장소 루트의 `.env`에 아래 값을 설정합니다. 실제 접속 문자열과 API 키는 Git에 올리지 않습니다.

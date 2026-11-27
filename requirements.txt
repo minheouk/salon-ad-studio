@@ -9,3 +9,6 @@
 ruff>=0.12              # 함수 복잡도 검사 (pyproject.toml)
 pytest>=8               # 커밋 전 검사 (tests/)
 ipykernel>=6            # 노트북 실행 커널
+
+# ── 서비스 백엔드
+psycopg[binary]>=3.2,<4
