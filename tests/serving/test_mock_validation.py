@@ -6,8 +6,11 @@ import zlib
 import pytest
 
 from src.pipelines.serving.mock.validation import (
+    MAX_COPY_IMAGES,
     MAX_FILE_BYTES,
     ApiError,
+    check_copy_images,
+    check_edit_prompts,
     check_photo,
     check_photos,
     check_prompt,
@@ -46,6 +49,22 @@ def test_png_and_jpeg_pass_with_their_size():
 @pytest.mark.parametrize("prompt", ["", "   ", None])
 def test_empty_prompt_is_rejected(prompt):
     assert error_code(lambda: check_prompt(prompt)) == "EMPTY_PROMPT"
+
+
+def test_edit_prompts_are_optional_but_checked_like_prompt():
+    assert check_edit_prompts([]) == []
+    assert check_edit_prompts([" 배경을 더 밝게 "]) == ["배경을 더 밝게"]
+    with pytest.raises(ApiError) as caught:
+        check_edit_prompts(["밝게", " "])
+    assert (caught.value.code, caught.value.field) == ("EMPTY_PROMPT", "editPrompts")
+
+
+def test_copy_accepts_1_to_max_final_images():
+    image = make_png(1024, 1024)
+    assert len(check_copy_images([image])) == 1
+    assert len(check_copy_images([image] * MAX_COPY_IMAGES)) == MAX_COPY_IMAGES
+    assert error_code(lambda: check_copy_images([])) == "PHOTO_COUNT"
+    assert error_code(lambda: check_copy_images([image] * (MAX_COPY_IMAGES + 1))) == "PHOTO_COUNT"
 
 
 def test_prompt_limit_is_200_chars():

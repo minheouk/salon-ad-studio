@@ -40,11 +40,12 @@ def api(server_url, monkeypatch):
     return server_url
 
 
-def encode_form(fields: dict[str, str], images: list[bytes]) -> tuple[bytes, str]:
+def encode_form(fields: list[tuple[str, str]], images: list[bytes]) -> tuple[bytes, str]:
+    """같은 이름의 필드(editPrompts)를 여러 번 보낼 수 있도록 (이름, 값) 목록을 받는다."""
     boundary = uuid.uuid4().hex
     parts = [
         f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
-        for name, value in fields.items()
+        for name, value in fields
     ]
     for number, image in enumerate(images, start=1):
         header = (
@@ -65,9 +66,16 @@ def request(url: str, data: bytes | None = None, headers: dict | None = None):
         return error.code, error.headers, error.read()
 
 
-def generate(api: str, prompt: str = PROMPT, images: list[bytes] | None = None, path: str = "/generate"):
+def generate(
+    api: str,
+    prompt: str = PROMPT,
+    images: list[bytes] | None = None,
+    path: str = "/generate",
+    edit_prompts: tuple[str, ...] = (),
+):
     images = [make_png(1024, 1024)] if images is None else images
-    body, content_type = encode_form({**STORE_FIELDS, "prompt": prompt}, images)
+    fields = [*STORE_FIELDS.items(), ("prompt", prompt), *(("editPrompts", text) for text in edit_prompts)]
+    body, content_type = encode_form(fields, images)
     status, headers, raw = request(api + path, body, {"Content-Type": content_type})
     return status, headers, json.loads(raw)
 
@@ -84,48 +92,76 @@ def test_generate_returns_price_table_first_then_nail_tips(api):
 
 
 @pytest.mark.parametrize(
-    ("prompt", "images", "code"),
+    ("prompt", "images", "code", "field"),
     [
-        ("", None, "EMPTY_PROMPT"),
-        (PROMPT, [], "PHOTO_COUNT"),
-        (PROMPT, [make_png(1024, 1024)] * 2, "PHOTO_COUNT"),
-        (PROMPT, [b"GIF89a"], "UNSUPPORTED_FORMAT"),
+        ("가" * 201, None, "PROMPT_TOO_LONG", "prompt"),
+        (PROMPT, [], "PHOTO_COUNT", "images"),
+        (PROMPT, [make_png(1024, 1024)] * 2, "PHOTO_COUNT", "images"),
+        (PROMPT, [b"GIF89a"], "UNSUPPORTED_FORMAT", "images"),
     ],
 )
-def test_invalid_input_is_rejected_with_400(api, prompt, images, code):
+def test_invalid_input_is_rejected_with_400_and_field(api, prompt, images, code, field):
     status, _, body = generate(api, prompt, images)
-    assert (status, body["code"]) == (400, code)
+    assert (status, body["error"]["code"], body["error"]["field"]) == (400, code, field)
 
 
 @pytest.mark.parametrize("path", ["/generate", "/copy"])
-def test_200_char_prompt_with_trailing_space_is_accepted(api, path):
+def test_200_char_prompt_is_accepted(api, path):
     assert generate(api, "가" * 200 + " ", path=path)[0] == 200
 
 
-def test_copy_returns_caption_and_hashtags_in_the_same_response(api):
-    status, _, body = generate(api, path="/copy")
+@pytest.mark.parametrize("path", ["/generate", "/copy"])
+@pytest.mark.parametrize("prompt", ["", "   "])
+def test_empty_prompt_is_rejected(api, path, prompt):
+    status, _, body = generate(api, prompt, path=path)
+    assert (status, body["error"]["code"], body["error"]["field"]) == (400, "EMPTY_PROMPT", "prompt")
+
+
+def test_copy_accepts_several_final_images_and_edit_prompts(api):
+    final_images = [make_png(1024, 1024)] * 3
+    status, _, body = generate(
+        api, path="/copy", images=final_images, edit_prompts=("배경을 더 밝게 바꿔 주세요.",)
+    )
     assert status == 200
     assert set(body) == {"timing_ms", "caption", "hashtags"}
+
+
+def test_copy_caption_includes_all_store_fields(api):
+    caption = generate(api, path="/copy")[2]["caption"]
+    for value in STORE_FIELDS.values():
+        assert value in caption
+
+
+@pytest.mark.parametrize("count", [0, 14])
+def test_copy_rejects_wrong_image_count(api, count):
+    status, _, body = generate(api, path="/copy", images=[make_png(1024, 1024)] * count)
+    assert (status, body["error"]["code"], body["error"]["field"]) == (400, "PHOTO_COUNT", "images")
+
+
+def test_copy_rejects_empty_edit_prompt(api):
+    status, _, body = generate(api, path="/copy", edit_prompts=(" ",))
+    assert (status, body["error"]["code"], body["error"]["field"]) == (400, "EMPTY_PROMPT", "editPrompts")
 
 
 @pytest.mark.parametrize(
     ("path", "marker", "status", "body"),
     [
-        ("/generate", "[mock:failed]", 502, {"code": "GENERATION_FAILED", "message": "광고를 만들지 못했습니다. 다시 시도해 주세요."}),
-        ("/copy", "[mock:failed]", 502, {"code": "GENERATION_FAILED", "message": "광고 문구를 만들지 못했습니다. 다시 시도해 주세요."}),
-        ("/generate", "[mock:timeout]", 504, {"code": "TIMEOUT", "message": "처리 시간이 60초를 넘었습니다. 다시 시도해 주세요."}),
+        ("/generate", "[mock:failed]", 502, ("GENERATION_FAILED", "광고를 만들지 못했습니다. 다시 시도해 주세요.")),
+        ("/copy", "[mock:failed]", 502, ("GENERATION_FAILED", "광고 문구를 만들지 못했습니다. 다시 시도해 주세요.")),
+        ("/generate", "[mock:timeout]", 504, ("TIMEOUT", "처리 시간이 60초를 넘었습니다. 다시 시도해 주세요.")),
     ],
 )
 def test_prompt_marker_forces_failure(api, path, marker, status, body):
+    code, message = body
     result = generate(api, f"{PROMPT} {marker}", path=path)
-    assert (result[0], result[2]) == (status, body)
+    assert (result[0], result[2]) == (status, {"error": {"code": code, "field": None, "message": message}})
 
 
 def test_generation_over_the_server_limit_times_out(api, monkeypatch):
     monkeypatch.setattr(generation, "MOCK_DELAY_SECONDS", 1)
     monkeypatch.setattr(generation, "SERVER_TIMEOUT_SECONDS", 0.05)
     status, _, body = generate(api)
-    assert (status, body["code"]) == (504, "TIMEOUT")
+    assert (status, body["error"]["code"]) == (504, "TIMEOUT")
 
 
 def test_new_request_is_rejected_when_queue_is_full(api, monkeypatch):
@@ -136,7 +172,7 @@ def test_new_request_is_rejected_when_queue_is_full(api, monkeypatch):
     time.sleep(0.3)
 
     status, headers, body = generate(api)
-    assert (status, body["code"], headers["Retry-After"]) == (429, "QUEUE_FULL", "10")
+    assert (status, body["error"]["code"], headers["Retry-After"]) == (429, "QUEUE_FULL", "10")
     for thread in waiting:
         thread.join()
 
@@ -144,33 +180,33 @@ def test_new_request_is_rejected_when_queue_is_full(api, monkeypatch):
 def test_download_url_expires_and_rejects_tampering(api, monkeypatch):
     url = generate(api)[2]["results"][0]["url"]
     status, _, raw = request(api + url.replace("signature=", "signature=0"))
-    assert (status, json.loads(raw)["code"]) == (403, "INVALID_SIGNATURE")
+    assert (status, json.loads(raw)["error"]["code"]) == (403, "INVALID_SIGNATURE")
 
     monkeypatch.setattr(signed_url, "URL_TTL_SECONDS", -1)
     expired_url = generate(api)[2]["results"][0]["url"]
     status, _, raw = request(api + expired_url)
-    assert (status, json.loads(raw)["code"]) == (403, "URL_EXPIRED")
+    assert (status, json.loads(raw)["error"]["code"]) == (403, "URL_EXPIRED")
 
 
 def test_result_is_removed_after_retention(api, monkeypatch):
     url = generate(api)[2]["results"][0]["url"]
     monkeypatch.setattr(generation, "RESULT_TTL_SECONDS", 0)
     status, _, raw = request(api + url)
-    assert (status, json.loads(raw)["code"]) == (404, "RESULT_NOT_FOUND")
+    assert (status, json.loads(raw)["error"]["code"]) == (404, "RESULT_NOT_FOUND")
 
 
 def test_json_body_is_rejected(api):
     status, _, raw = request(f"{api}/generate", b"{}", {"Content-Type": "application/json"})
-    assert (status, json.loads(raw)["code"]) == (415, "INVALID_FORM")
+    assert (status, json.loads(raw)["error"]["code"]) == (415, "INVALID_FORM")
 
 
 def test_oversized_body_is_rejected_before_reading(api):
     headers = {"Content-Type": "multipart/form-data; boundary=x", "Content-Length": str(10**9)}
     status, _, raw = request(f"{api}/generate", b"--x--", headers)
-    assert (status, json.loads(raw)["code"]) == (413, "BODY_TOO_LARGE")
+    assert (status, json.loads(raw)["error"]["code"]) == (413, "BODY_TOO_LARGE")
 
 
 @pytest.mark.parametrize("path", ["/api/unknown", "/api/jobs/generate"])
 def test_unknown_path_returns_404(api, path):
     status, _, raw = request(api + path, b"")
-    assert (status, json.loads(raw)["code"]) == (404, "NOT_FOUND")
+    assert (status, json.loads(raw)["error"]["code"]) == (404, "NOT_FOUND")
