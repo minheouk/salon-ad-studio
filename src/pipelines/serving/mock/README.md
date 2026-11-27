@@ -125,7 +125,7 @@ curl -X POST http://127.0.0.1:8004/generate \
 예: `prompt=겨울 네일 광고 [mock:failed]`
 
 - 60초를 기다리지 않도록, 다른 요청처럼 **3초 뒤에** 응답합니다.
-- `/generate`, `/edit`, `/copy` 모두 됩니다. `/edit`은 `prompt`와 `imagePrompt` 어느 쪽에 넣어도 됩니다.
+- `/generate`, `/edit`, `/copy` 모두 됩니다. `/edit`은 `commonPrompt`와 `imagePrompt` 어느 쪽에 넣어도 됩니다.
 - 실패 문구는 `/edit`이 `광고를 수정하지 못했습니다. 다시 시도해 주세요.`, `/copy`가 `광고 문구를 만들지 못했습니다. 다시 시도해 주세요.`입니다.
 - 표시도 200자 제한에 포함됩니다.
 - **목업 전용 기능입니다.** 실제 서빙 API에는 넣지 않습니다.
@@ -147,19 +147,22 @@ API 명세의 AI-02입니다. **결과 수정 단계에서** 웹 백엔드가 �
 
 ```sh
 curl -X POST http://127.0.0.1:8004/edit \
-  -F "prompt=전체 배경을 더 밝게 바꿔 주세요." \
-  -F "imagePrompt=이 이미지는 글자를 더 크게 해 주세요." \
-  -F "images=@result-2.png"
+  -F "image=@nail-tip-2.png;type=image/png" \
+  -F "commonPrompt=전체 배경을 밝게 바꿔 주세요." \
+  -F "imagePrompt=손톱 글리터를 더 반짝이게 해 주세요."
 ```
 
-| 필드 | 규칙 |
-|---|---|
-| `images` | 수정할 이미지 정확히 1장. 웹 백엔드가 보관한 결과 파일. PNG 또는 JPG, 10MB 이하 |
-| `prompt` | 공통 프롬프트. 여러 장에 똑같이 적용할 수정 내용 |
-| `imagePrompt` | 개별 프롬프트. 이 이미지에만 적용할 수정 내용 |
+필드 이름은 웹에서 먼저 정한 이름(명세 AI-02)을 그대로 씁니다.
 
-- `prompt`와 `imagePrompt` 중 **하나 이상**을 보냅니다. 둘 다 없으면 `400 EMPTY_PROMPT`(`field`: `prompt`)입니다.
+| 필드 | 필수 | 규칙 |
+|---|---|---|
+| `image` | O | 수정할 이미지 정확히 1장. 웹 백엔드가 보관한 결과 파일. PNG 또는 JPG, 10MB 이하. `/generate`·`/copy`와 달리 `images`가 아닙니다 |
+| `commonPrompt` | 둘 중 하나 이상 | 공통 지시. 여러 장에 똑같이 적용할 수정 내용 |
+| `imagePrompt` | 둘 중 하나 이상 | 개별 지시. 이 이미지에만 적용할 수정 내용 |
+
+- 입력하지 않은 프롬프트 필드는 보내지 않습니다. 둘 다 없으면 `400 EMPTY_PROMPT`(`field`: `commonPrompt`)입니다.
 - 보낸 값은 `/generate`의 `prompt`와 같은 규칙(앞뒤 공백을 뺀 뒤 1~200자)으로 검사합니다. 보냈는데 비어 있으면 `400 EMPTY_PROMPT`이고, `field`에 그 필드 이름이 들어갑니다.
+- 두 지시가 부딪히면 개별 지시를 우선하고, 나머지 공통 지시는 함께 적용합니다(명세 AI-02). 이 처리는 모델이 하고, 목업은 두 값을 검사만 합니다.
 - 연속 수정 3회 제한(`EDIT_LIMIT_EXCEEDED`)은 웹 백엔드가 검사합니다. 서빙은 이전 수정 횟수를 기억하지 않습니다.
 - **수정 대상은 네일 팁 이미지만입니다.** 가격표 수정 지원 여부는 모델팀 확인 대기입니다.
   - 가격표는 한글 문구와 가격을 이미지 위에 합성해서 만듭니다. 이미지 수정 모델로 고치면 글자가 깨질 수 있어서, 고칠 수 있게 되더라도 가격·문구를 바꿔 다시 합성하는 별도 방식이 될 수 있습니다.
@@ -255,7 +258,7 @@ Retry-After: 10
 
 실패하면 HTTP 상태 번호와 함께 `error` 안에 `code`, `field`, `message`를 돌려줍니다. 웹 탭(WEB-xx)의 오류 형식과 같습니다.
 - 웹에서는 **HTTP 상태 번호로 입력 오류(4xx)인지 판단**하고, `code`로 분기합니다.
-- `field`는 문제가 된 요청 필드 이름(`images`, `prompt`, `imagePrompt`, `editPrompts`)입니다. 필드와 관계없는 오류는 `null`입니다.
+- `field`는 문제가 된 요청 필드 이름(`images`, `image`, `prompt`, `commonPrompt`, `imagePrompt`, `editPrompts`)입니다. 필드와 관계없는 오류는 `null`입니다.
 - `message`는 사용자에게 그대로 보여 주면 됩니다.
 
 ```json
@@ -266,14 +269,14 @@ Retry-After: 10
 
 | HTTP | `code` | `field` | 언제 |
 |---|---|---|---|
-| 400 | `EMPTY_PROMPT` | `prompt`, `imagePrompt`, `editPrompts` | 앞뒤 공백을 빼면 비어 있음. `/edit`은 두 프롬프트가 모두 없을 때도 |
-| 400 | `PROMPT_TOO_LONG` | `prompt`, `imagePrompt`, `editPrompts` | 요청 내용이 200자를 넘음 |
-| 400 | `PHOTO_COUNT` | `images` | `/generate`·`/edit`: 이미지가 1장이 아님 / `/copy`: 이미지가 1~13장이 아님 |
-| 400 | `UNSUPPORTED_FORMAT` | `images` | 파일 내용이 PNG·JPG가 아님 |
-| 400 | `FILE_TOO_LARGE` | `images` | 사진 한 장이 10MB를 넘음 |
-| 400 | `BROKEN_IMAGE` | `images` | 파일이 손상됨 (아래 참고) |
-| 400 | `RESOLUTION_TOO_LOW` | `images` | 짧은 변이 512px 미만 |
-| 400 | `RESOLUTION_TOO_HIGH` | `images` | 긴 변이 8192px 초과 |
+| 400 | `EMPTY_PROMPT` | `prompt`, `commonPrompt`, `imagePrompt`, `editPrompts` | 앞뒤 공백을 빼면 비어 있음. `/edit`은 두 프롬프트가 모두 없을 때도 |
+| 400 | `PROMPT_TOO_LONG` | `prompt`, `commonPrompt`, `imagePrompt`, `editPrompts` | 요청 내용이 200자를 넘음 |
+| 400 | `PHOTO_COUNT` | `images` (`/edit`은 `image`) | `/generate`·`/edit`: 이미지가 1장이 아님 / `/copy`: 이미지가 1~13장이 아님 |
+| 400 | `UNSUPPORTED_FORMAT` | `images` (`/edit`은 `image`) | 파일 내용이 PNG·JPG가 아님 |
+| 400 | `FILE_TOO_LARGE` | `images` (`/edit`은 `image`) | 사진 한 장이 10MB를 넘음 |
+| 400 | `BROKEN_IMAGE` | `images` (`/edit`은 `image`) | 파일이 손상됨 (아래 참고) |
+| 400 | `RESOLUTION_TOO_LOW` | `images` (`/edit`은 `image`) | 짧은 변이 512px 미만 |
+| 400 | `RESOLUTION_TOO_HIGH` | `images` (`/edit`은 `image`) | 긴 변이 8192px 초과 |
 | 413 | `BODY_TOO_LARGE` | `null` | 요청 전체가 한도를 넘음. `/generate`·`/edit` 11MB(사진 10MB + 텍스트 여유 1MB), `/copy` 131MB(13장 × 10MB + 1MB, 임시) |
 | 415 | `INVALID_FORM` | `null` | `Content-Type`이 `multipart/form-data`가 아님 |
 
@@ -310,7 +313,7 @@ Retry-After: 10
 - **결과 이미지 ID**: `results[]`에 넣을 이미지 ID의 필드 이름과 형식은 아직 정해지지 않아 목업에 넣지 않았습니다.
 - **네일 팁 이미지 수**: 실제 모델이 몇 장(최대 12장)을 만들지 정해지면 맞춥니다. 목업은 항상 12장입니다.
 - **대기 가능한 요청 수**: 처리 중 1개와 대기 2개는 임시로 정한 값입니다.
-- **`/edit` 요청 형식**: 개별 프롬프트 필드 이름(`imagePrompt`)과, 공통·개별 프롬프트가 부딪힐 때의 우선순위는 임시입니다. 모델팀이 수정 기능 지원 여부와 입력 형식을 확인하면 맞춥니다.
+- **`/edit` 수정 지원**: 필드 이름(`image`, `commonPrompt`, `imagePrompt`)은 웹 초안대로 정했습니다. 모델팀이 수정 기능 지원 여부와 두 지시를 합치는 방식을 확인하면 맞춥니다.
 - **결과 파일 저장 위치**: 목업은 메모리에 둡니다. 실제 서버는 24시간 보관할 곳(`outputs/` 등, 커밋 금지)을 정해야 합니다.
 - **5초 동영상**: 지원 여부가 정해지면 추가합니다.
 - **이 요청·응답 형식은 아직 서빙 쪽 제안입니다.** 서비스·모델 담당과 합의하면 `src/common/`에 정의합니다. `src/common/`은 공용 파일이라 PM 승인이 필요합니다.

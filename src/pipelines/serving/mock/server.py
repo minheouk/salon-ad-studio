@@ -38,6 +38,8 @@ HOST = "127.0.0.1"
 # /edit: 결과 수정 단계. 이미지 1장을 받아 수정본 1장을 만든다. 문구는 만들지 않는다.
 # /copy: 이미지를 다 고른 뒤 게시 미리보기에서 따로 부른다. 최종 이미지 여러 장으로 문구를 만든다.
 GENERATE_ROUTES = {"/generate": generation.IMAGES, "/edit": generation.EDIT, "/copy": generation.COPY}
+# 파일로 받는 요청 필드. /generate·/copy는 images, /edit은 수정할 이미지 1장을 image로 받는다.
+FILE_FIELDS = ("images", "image")
 # 웹 백엔드가 채팅에 저장해 둔 매장 정보. /copy는 이 값을 게시글 본문에 넣는다.
 STORE_FIELDS = ("shop", "instagramId", "businessHours", "booking")
 # 이미지 최대 장수 × 최대 크기에, 텍스트 필드와 multipart 경계 문자열 몫으로 1MB를 더한다.
@@ -62,24 +64,24 @@ def mock_outcome(prompt: str) -> str:
     return generation.SUCCEEDED
 
 
-def parse_form(content_type: str, body: bytes) -> tuple[dict[str, list[str]], list[bytes]]:
-    """multipart/form-data 본문을 텍스트 필드와 images 파일 목록으로 나눈다.
+def parse_form(content_type: str, body: bytes) -> tuple[dict[str, list[str]], dict[str, list[bytes]]]:
+    """multipart/form-data 본문을 텍스트 필드와 파일 필드(images, image)로 나눈다.
 
-    같은 이름이 여러 번 올 수 있어서(editPrompts) 텍스트 필드는 값 목록으로 모은다. images는 보낸 순서를 지킨다.
+    같은 이름이 여러 번 올 수 있어서(editPrompts, images) 값은 목록으로 모은다. 파일은 보낸 순서를 지킨다.
     """
     message = BytesParser(policy=policy.HTTP).parsebytes(
         f"Content-Type: {content_type}\r\n\r\n".encode() + body
     )
     fields: dict[str, list[str]] = {}
-    images: list[bytes] = []
+    files: dict[str, list[bytes]] = {}
     for part in message.iter_parts():
         name = part.get_param("name", header="content-disposition")
         data = part.get_payload(decode=True) or b""
-        if name == "images":
-            images.append(data)
+        if name in FILE_FIELDS:
+            files.setdefault(name, []).append(data)
         elif name:
             fields.setdefault(name, []).append(data.decode("utf-8", errors="replace"))
-    return fields, images
+    return fields, files
 
 
 def last_value(fields: dict[str, list[str]], name: str) -> str | None:
@@ -87,20 +89,20 @@ def last_value(fields: dict[str, list[str]], name: str) -> str | None:
     return values[-1] if values else None
 
 
-def check_generate_input(fields: dict[str, list[str]], images: list[bytes]) -> str:
-    check_photos(images)
+def check_generate_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]) -> str:
+    check_photos(files.get("images", []))
     return check_prompt(last_value(fields, "prompt"))
 
 
-def check_edit_input(fields: dict[str, list[str]], images: list[bytes]) -> str:
-    # 수정할 이미지 1장과, 공통 프롬프트·개별 프롬프트 중 하나 이상을 받는다.
-    check_photos(images)
-    return check_edit_instructions(last_value(fields, "prompt"), last_value(fields, "imagePrompt"))
+def check_edit_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]) -> str:
+    # 수정할 이미지 1장(image)과, 공통 프롬프트(commonPrompt)·개별 프롬프트(imagePrompt) 중 하나 이상을 받는다.
+    check_photos(files.get("image", []), field="image")
+    return check_edit_instructions(last_value(fields, "commonPrompt"), last_value(fields, "imagePrompt"))
 
 
-def check_copy_input(fields: dict[str, list[str]], images: list[bytes]) -> str:
+def check_copy_input(fields: dict[str, list[str]], files: dict[str, list[bytes]]) -> str:
     # 게시할 최종 이미지 여러 장과, 최초 프롬프트에 더해 수정 단계의 수정 프롬프트도 받는다.
-    check_copy_images(images)
+    check_copy_images(files.get("images", []))
     check_edit_prompts(fields.get("editPrompts", []))
     return check_prompt(last_value(fields, "prompt"))
 
@@ -169,15 +171,15 @@ class MockHandler(BaseHTTPRequestHandler):
             self.send_error_json(error)
 
     def generate(self, kind: str) -> generation.Generation:
-        fields, images = self.read_form(MAX_BODY_BYTES[kind])
+        fields, files = self.read_form(MAX_BODY_BYTES[kind])
         # 처리 시간은 요청 본문을 다 받은 뒤부터 잰다. 업로드 시간은 넣지 않는다.
         received_at = time.monotonic()
-        prompt = INPUT_CHECKS[kind](fields, images)
+        prompt = INPUT_CHECKS[kind](fields, files)
         # 매장 정보 형식 검사는 웹 백엔드가 한다. 목업은 받은 값을 그대로 쓴다.
         store = {name: last_value(fields, name) or "" for name in STORE_FIELDS}
         return self.generator.generate(kind, mock_outcome(prompt), received_at, store)
 
-    def read_form(self, max_body_bytes: int) -> tuple[dict[str, list[str]], list[bytes]]:
+    def read_form(self, max_body_bytes: int) -> tuple[dict[str, list[str]], dict[str, list[bytes]]]:
         length = int(self.headers.get("Content-Length") or 0)
         if length > max_body_bytes:
             # 본문을 읽지 않고 거절하므로 연결을 닫아 남은 데이터가 다음 요청으로 섞이지 않게 한다.

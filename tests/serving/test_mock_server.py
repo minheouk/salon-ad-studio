@@ -40,8 +40,13 @@ def api(server_url, monkeypatch):
     return server_url
 
 
-def encode_form(fields: list[tuple[str, str]], images: list[bytes]) -> tuple[bytes, str]:
-    """같은 이름의 필드(editPrompts)를 여러 번 보낼 수 있도록 (이름, 값) 목록을 받는다."""
+def encode_form(
+    fields: list[tuple[str, str]], images: list[bytes], file_field: str = "images"
+) -> tuple[bytes, str]:
+    """같은 이름의 필드(editPrompts)를 여러 번 보낼 수 있도록 (이름, 값) 목록을 받는다.
+
+    file_field는 이미지를 담을 요청 필드 이름이다. /edit은 image를 쓴다.
+    """
     boundary = uuid.uuid4().hex
     parts = [
         f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
@@ -50,7 +55,7 @@ def encode_form(fields: list[tuple[str, str]], images: list[bytes]) -> tuple[byt
     for number, image in enumerate(images, start=1):
         header = (
             f"--{boundary}\r\nContent-Disposition: form-data; "
-            f'name="images"; filename="nail-{number}.png"\r\nContent-Type: image/png\r\n\r\n'
+            f'name="{file_field}"; filename="nail-{number}.png"\r\nContent-Type: image/png\r\n\r\n'
         )
         parts.append(header.encode() + image + b"\r\n")
     parts.append(f"--{boundary}--\r\n".encode())
@@ -80,9 +85,11 @@ def generate(
     return status, headers, json.loads(raw)
 
 
-def edit(api: str, fields: list[tuple[str, str]], images: list[bytes] | None = None):
+def edit(
+    api: str, fields: list[tuple[str, str]], images: list[bytes] | None = None, file_field: str = "image"
+):
     images = [make_png(1024, 1024)] if images is None else images
-    body, content_type = encode_form(fields, images)
+    body, content_type = encode_form(fields, images, file_field)
     status, headers, raw = request(api + "/edit", body, {"Content-Type": content_type})
     return status, headers, json.loads(raw)
 
@@ -151,7 +158,7 @@ def test_copy_rejects_empty_edit_prompt(api):
 
 
 def test_edit_returns_one_downloadable_result(api):
-    status, _, body = edit(api, [("prompt", "배경을 더 밝게 바꿔 주세요.")])
+    status, _, body = edit(api, [("commonPrompt", "배경을 더 밝게 바꿔 주세요.")])
     assert status == 200
     assert set(body) == {"generation_id", "timing_ms", "result", "results_expire_in_seconds"}
 
@@ -162,7 +169,11 @@ def test_edit_returns_one_downloadable_result(api):
 
 @pytest.mark.parametrize(
     "fields",
-    [[("prompt", "배경을 더 밝게")], [("imagePrompt", "글자를 크게")], [("prompt", "밝게"), ("imagePrompt", "크게")]],
+    [
+        [("commonPrompt", "배경을 더 밝게")],
+        [("imagePrompt", "글리터를 더 반짝이게")],
+        [("commonPrompt", "밝게"), ("imagePrompt", "반짝이게")],
+    ],
 )
 def test_edit_accepts_common_or_individual_prompt(api, fields):
     assert edit(api, fields)[0] == 200
@@ -171,10 +182,11 @@ def test_edit_accepts_common_or_individual_prompt(api, fields):
 @pytest.mark.parametrize(
     ("fields", "images", "code", "field"),
     [
-        ([], None, "EMPTY_PROMPT", "prompt"),
-        ([("prompt", "밝게"), ("imagePrompt", " ")], None, "EMPTY_PROMPT", "imagePrompt"),
+        ([], None, "EMPTY_PROMPT", "commonPrompt"),
+        ([("commonPrompt", "밝게"), ("imagePrompt", " ")], None, "EMPTY_PROMPT", "imagePrompt"),
         ([("imagePrompt", "가" * 201)], None, "PROMPT_TOO_LONG", "imagePrompt"),
-        ([("prompt", "밝게")], [make_png(1024, 1024)] * 2, "PHOTO_COUNT", "images"),
+        ([("commonPrompt", "밝게")], [make_png(1024, 1024)] * 2, "PHOTO_COUNT", "image"),
+        ([("commonPrompt", "밝게")], [b"GIF89a"], "UNSUPPORTED_FORMAT", "image"),
     ],
 )
 def test_edit_rejects_invalid_input(api, fields, images, code, field):
@@ -182,7 +194,13 @@ def test_edit_rejects_invalid_input(api, fields, images, code, field):
     assert (status, body["error"]["code"], body["error"]["field"]) == (400, code, field)
 
 
-@pytest.mark.parametrize("name", ["prompt", "imagePrompt"])
+def test_edit_takes_image_not_images(api):
+    """/generate·/copy의 images로 보내면 수정할 이미지가 없는 것으로 본다."""
+    status, _, body = edit(api, [("commonPrompt", "밝게")], file_field="images")
+    assert (status, body["error"]["code"], body["error"]["field"]) == (400, "PHOTO_COUNT", "image")
+
+
+@pytest.mark.parametrize("name", ["commonPrompt", "imagePrompt"])
 def test_edit_marker_forces_failure_in_either_prompt(api, name):
     status, _, body = edit(api, [(name, "밝게 [mock:failed]")])
     message = "광고를 수정하지 못했습니다. 다시 시도해 주세요."
