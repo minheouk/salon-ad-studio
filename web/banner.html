@@ -62,6 +62,9 @@
   .splitopt { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; cursor: pointer; line-height: 1.5; }
   .splitopt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
   .splitopt input { margin-top: 3px; accent-color: var(--accent); }
+  .tips-chart { margin: 10px 0 4px; }
+  .tips-chart .lab { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .tips-chart img { display: block; max-width: 100%; max-height: 120px; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
   .splitopt small { display: block; color: var(--muted); }
   .item-head .lab { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .err { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #fff0f0; color: var(--bad); font-size: 13px; }
@@ -179,9 +182,10 @@
       <input id="brand" maxlength="30" placeholder="예) 네일샷 스튜디오">
     </label>
     <details class="field">
-      <summary>추가 요청 (선택)</summary>
-      <input id="desc" maxlength="300" placeholder="예) 크리스마스 분위기, 따뜻한 조명 (배경 · 음료)">
-      <div class="hint">배경 · 음료 분위기에 반영돼요. 네일 디자인은 바뀌지 않아요.</div>
+      <summary>추가 요청 · 가격 (선택)</summary>
+      <input id="desc" maxlength="300" placeholder="예) 크리스마스 분위기 / 가격 6만5천원, 70000원, 1000원">
+      <div class="hint">배경 · 음료 분위기에 반영돼요. 네일 디자인은 바뀌지 않아요.<br>
+        <b>가격</b>을 적으면 인식 모델(luna)이 읽어서 만원 단위 라벨(<b>6.5, 7.0, 0.1</b>)로 바꾸고, 세트 순서대로(위 줄부터, 왼쪽부터) 원본 사진의 세트 오른쪽에 넣은 <b>가격표 사진</b>도 만들어요. "오만원"처럼 한글로 써도 돼요 (세트 나누기가 자동으로 켜져요).</div>
     </details>
 
     <div class="speed">
@@ -257,6 +261,7 @@
       <button class="btn" id="zipAll" disabled>전체 다운로드 (ZIP)</button>
     </div>
     <div class="empty" id="empty">왼쪽에서 네일 팁 사진을 올리고 <b>장면 사진 만들기</b>를 눌러 주세요.<br>완성된 사진은 다운로드하기 전에 <b>한꺼번에 미리보기</b>로 차례로 넘기며 확대 · 축소해 볼 수 있어요.</div>
+    <div class="item" id="priceSheets" hidden></div>
     <div class="items" id="items"></div>
   </section>
 </main>
@@ -349,7 +354,7 @@ fetch('/api/health').then(r => r.json()).then(h => {
   if (h.fake || !h.analysis_model) document.querySelectorAll('.eff').forEach(e => e.title = '화면 확인 모드(--fake)에서는 쓰이지 않아요');
   if (h.plan_model) $('mP').textContent = h.plan_model;
   MAX = h.max_designs || 1;
-  const [w, hh] = String(h.banner_size || '1536x1024').split('x').map(Number);
+  const [w, hh] = String(h.banner_size || '1024x1280').split('x').map(Number);
   if (w && hh) BANNER_RATIO = `${w} / ${hh}`;
   if (h.brand && !$('brand').value) $('brand').value = h.brand;
   updateModeUi();
@@ -421,6 +426,7 @@ function itemCard(it) {
       <div><div class="t">${it.no}번 ${it.sceneOnly ? '장면 사진' : '배너'}</div>${it.label ? `<div class="lab">${esc(it.label)}</div>` : ''}<div class="s" data-k="status">기다리는 중...</div></div>
       <div class="cost" data-k="cost"></div>
     </div>
+    ${it.tipsChart ? `<div class="tips-chart"><div class="lab">팁 나누기 · 손가락 배정 (왼쪽부터 엄지 → 새끼)</div><img src="${it.tipsChart}" alt="손가락 배정"></div>` : ''}
     <div class="steps">${STEPS.map(([k, t]) => `<div data-step="${k}">${t}</div>`).join('')}</div>
     <div class="item-body">
       <div>
@@ -498,12 +504,25 @@ async function readEvents(r, on) {
     }
   }
 }
+let priceSheets = [];
 async function onEvent(ev, d) {
   if (ev === 'sets_stage') { $('progress').textContent = d.text; return; }
+  if (ev === 'price_sheet') {   // 원본 사진에 세트마다 가격 라벨
+    const { blob, url } = await toBlobUrl(d.image);
+    const no = priceSheets.length + 1;
+    priceSheets.push({ blob, url, name: `price_sheet_${d.source + 1}.jpg` });
+    const box = $('priceSheets'); box.hidden = false;
+    const el = document.createElement('div');
+    el.innerHTML = `<div class="step" style="margin-bottom:8px"><b>₩</b> 가격표 사진 ${no} · 세트 ${d.prices.length}개에 가격 (${esc(d.prices.join(', '))})</div>`
+      + `<img src="${url}" alt="가격표 사진" style="max-width:100%;border-radius:12px;display:block">`
+      + `<a class="btn" style="display:inline-block;margin-top:8px" href="${url}" download="nailshot_${priceSheets[no - 1].name}">가격표 사진 다운로드</a>`;
+    box.appendChild(el);
+    return;
+  }
   if (ev === 'sets') {          // 세트 나누기 결과 -> 세트마다 카드
     const box = $('items'); box.innerHTML = '';
     const sc = effMode() === 'scene', so = sc && !effSceneBanner();
-    items = d.items.map(x => ({ no: x.item + 1, thumb: x.thumb, label: x.label, setCrop: x.is_set !== false ? x.thumb : null, scene: sc, sceneOnly: so }));
+    items = d.items.map(x => ({ no: x.item + 1, thumb: x.thumb, label: x.label, setCrop: x.is_set !== false ? x.thumb : null, tipsChart: x.tips_chart || null, scene: sc, sceneOnly: so }));
     items.forEach(it => box.appendChild(itemCard(it)));
     if (!items.length) $('empty').hidden = false;
     updateProgress();
@@ -578,6 +597,8 @@ async function run() {
   busy = true; setErr(''); renderUploads();
   items.forEach(it => { it.nail && URL.revokeObjectURL(it.nail.url); it.banner && URL.revokeObjectURL(it.banner.url); });
   const box = $('items'); box.innerHTML = ''; $('empty').hidden = true;
+  priceSheets.forEach(p => URL.revokeObjectURL(p.url)); priceSheets = [];
+  $('priceSheets').innerHTML = ''; $('priceSheets').hidden = true;
   const scene = effMode() === 'scene', sceneOnly = scene && !effSceneBanner();
   if (splitOn()) {      // 세트 목록이 오면 카드를 만들어요
     items = [];
@@ -645,6 +666,7 @@ function saveBlob(blob, name) {
 $('zipAll').onclick = async () => {
   const list = ready(); if (!list.length) return;
   const entries = [];
+  priceSheets.forEach(p => entries.push({ name: p.name, blob: p.blob }));      // 가격표 사진
   for (const it of items) {      // 세트 나누기: 잘라낸 세트 사진도 각각 (실패한 세트 포함)
     if (it.setCrop) entries.push({ name: `sets/nailshot_set_${it.no}.jpg`, blob: await (await fetch(it.setCrop)).blob() });
   }

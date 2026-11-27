@@ -56,7 +56,7 @@ class HealthResponse(BaseModel):
     fake: bool = Field(..., description="true 면 OpenAI 를 부르지 않는 화면 확인 모드")
     show_cost: bool = Field(..., description="false 면 비용 정보를 응답에 넣지 않음 (server.hide_cost)")
     qualities: List[Quality] = Field(default_factory=lambda: ["fast", "normal", "high"])
-    banner_size: str = Field("1536x1024", description="배너 크기 (settings.yaml banner.size)")
+    banner_size: str = Field("1024x1280", description="배너 크기 (settings.yaml banner.size)")
     max_designs: int = Field(5, description="배너 요청 한 번에 올릴 수 있는 사진 수")
     pose: str = Field("auto", description="settings.yaml banner.pose (auto | keep)")
     apply_mode: str = Field("mask", description="settings.yaml banner.apply_mode (mask | free | direct | scene)")
@@ -127,7 +127,7 @@ class AlignInfo(BaseModel):
 
 
 class NailExtend(BaseModel):
-    length: str = Field(..., description="적용한 길이 keep|short|medium|long|extra_long")
+    length: str = Field(..., description="적용한 길이 keep|short|medium|long|extra_long|tip (tip = 팁 세트: 손톱마다 자기 팁 사진의 길이 · 모양 그대로)")
     shape: str = Field(..., description="적용한 모양 (unknown = 모름)")
     ratio: float = Field(..., description="손톱 영역을 손톱 길이의 몇 배 늘렸는지. 0 = 원래 길이")
 
@@ -219,6 +219,7 @@ class BannerSetItem(BaseModel):
     label: str = Field(..., description="예: '1번 사진 · 3세트 · 핑크 리본'")
     thumb: str = Field(..., description="잘라낸 세트 사진 (data URL)")
     is_set: bool = Field(True, description="true = 세트를 잘라낸 사진, false = 세트를 못 찾아 사진 전체")
+    tips_chart: Optional[str] = Field(None, description="팁을 하나씩 나눈 손가락 배정표 (왼쪽부터 엄지·검지·중지·약지·새끼, data URL). 못 나누면 null")
 
 
 class BannerSetsEvent(BaseModel):
@@ -226,6 +227,14 @@ class BannerSetsEvent(BaseModel):
     total: int
     dropped: int = Field(0, description="sheet.max_sets 를 넘어 만들지 않는 세트 수")
     items: List[BannerSetItem]
+
+
+class BannerPriceSheetEvent(BaseModel):
+    """추가 요청에 가격을 적었을 때 (세트 나누기 뒤): 원본 사진에 세트마다 가격 라벨을 넣은 사진"""
+    source: int = Field(..., description="몇 번째로 올린 사진인지 (0부터)")
+    image: str = Field(..., description="가격 라벨을 넣은 사진 (data URL)")
+    prices: List[str] = Field(..., description="세트 순서대로 붙인 가격 (만원 단위, 예: '5.0')")
+    sets: int = Field(..., description="그 사진에서 찾은 세트 수")
 
 
 class BannerStageEvent(BaseModel):

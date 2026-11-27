@@ -17,7 +17,7 @@ if not exist "%PY%" (
     exit /b 1
   )
   "%PY%" -m pip install --upgrade pip
-  "%PY%" -m pip install -r "%~dp0requirements_api.txt"
+  "%PY%" -m pip install -r "%~dp0requirements.txt"
   if errorlevel 1 (
     echo [ERROR] Package install failed. Check the internet connection and run this file again.
     rmdir /s /q "%~dp0venv_api"

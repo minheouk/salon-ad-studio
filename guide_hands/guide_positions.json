@@ -1,0 +1,26 @@
+{
+ "_설명": {
+  "쓰는 곳": "이미지 모델 방식(banner.tip_paste: false 이거나 nail_positions.json 자리가 없을 때)에서, 팁을 이 손 사진에 먼저 붙여 '낀 모습 예시'로 함께 보내요. 서버는 읽기만 해요",
+  "file": "이 폴더 안 사진 파일 이름",
+  "좌표": "x, y = 사진 가로 · 세로에 대한 비율 (0~1, 왼쪽 위가 0,0)",
+  "tip": "손톱 끝 (free edge)",
+  "base": "손톱 뿌리 (큐티클 쪽 끝 가운데)",
+  "w": "손톱 폭 (사진 가로에 대한 비율)"
+ },
+ "right": {
+  "file": "right.jpg",
+  "thumb":  {"visible": true, "tip": [0.338, 0.565], "base": [0.145, 0.545], "w": 0.15},
+  "index":  {"visible": true, "tip": [0.432, 0.330], "base": [0.465, 0.195], "w": 0.135},
+  "middle": {"visible": true, "tip": [0.560, 0.443], "base": [0.605, 0.311], "w": 0.15},
+  "ring":   {"visible": true, "tip": [0.643, 0.585], "base": [0.695, 0.467], "w": 0.15},
+  "little": {"visible": true, "tip": [0.688, 0.716], "base": [0.767, 0.622], "w": 0.12}
+ },
+ "left": {
+  "file": "left.jpg",
+  "thumb":  {"visible": true, "tip": [0.685, 0.565], "base": [0.885, 0.555], "w": 0.15},
+  "index":  {"visible": true, "tip": [0.615, 0.298], "base": [0.555, 0.172], "w": 0.125},
+  "middle": {"visible": true, "tip": [0.502, 0.402], "base": [0.412, 0.276], "w": 0.142},
+  "ring":   {"visible": true, "tip": [0.375, 0.534], "base": [0.285, 0.405], "w": 0.14},
+  "little": {"visible": true, "tip": [0.322, 0.690], "base": [0.232, 0.600], "w": 0.115}
+ }
+}
