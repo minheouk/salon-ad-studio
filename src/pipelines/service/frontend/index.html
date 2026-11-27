@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="네일 사진 한 장으로 이달의 아트 게시물을 만들어 보세요.">
+  <title>원컷 네일 | 사진 1장이면 끝</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" type="module"></script>
+</head>
+<body>
+  <div class="first-screen">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="원컷 네일 홈">
+        <span class="brand-mark" aria-hidden="true">✳</span> 원컷 네일
+      </a>
+      <nav aria-label="계정">
+        <button class="button button-plain" type="button" data-guest data-auth="로그인">로그인</button>
+        <button class="button button-outline" type="button" data-guest data-auth="회원가입">회원가입</button>
+        <a class="button button-outline" href="./mypage.html" data-account hidden>마이페이지</a>
+        <button class="button button-plain" type="button" data-account data-logout hidden>로그아웃</button>
+        <p class="auth-status" data-logout-status role="status"></p>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <h1 id="hero-title">사진 1장이면 <span>끝</span></h1>
+        <p>네일 사진 한 장으로 이달의 아트 게시물을 만들고<br class="desktop-break">
+          인스타그램에 올리세요.</p>
+        <a class="button button-primary" href="./create.html" data-auth-create>
+          광고 만들기 <span aria-hidden="true">↗</span>
+        </a>
+
+        <figure class="demo">
+          <figcaption><span aria-hidden="true"></span> 원컷 네일 실사용 영상</figcaption>
+          <!-- 촬영본을 연결할 때 .demo-placeholder를 video 요소로 교체합니다. -->
+          <div class="demo-placeholder">
+            <span class="play-mark" aria-hidden="true">▶</span>
+            <strong>실사용 영상 준비 중</strong>
+            <span>사진 첨부 · 결과 생성 · 인스타그램 게시</span>
+          </div>
+        </figure>
+      </section>
+    </main>
+  </div>
+
+  <section class="gallery" aria-labelledby="gallery-title">
+    <div class="gallery-inner">
+      <h2 id="gallery-title">원컷 네일로 만든 게시물</h2>
+      <p>사진 한 장에서 생성되는 가격표와 네일팁 이미지입니다.</p>
+      <div class="gallery-grid">
+        <!-- 실제 결과물을 연결할 때 각 .image-placeholder를 img 요소로 교체합니다. -->
+        <figure>
+          <div class="image-placeholder price-preview" aria-hidden="true"><i></i></div>
+          <figcaption>가격표 <span>예시</span></figcaption>
+        </figure>
+        <figure>
+          <div class="image-placeholder nail-preview" aria-hidden="true"><i></i></div>
+          <figcaption>네일팁 이미지 1 <span>예시</span></figcaption>
+        </figure>
+        <figure>
+          <div class="image-placeholder nail-preview alternate" aria-hidden="true"><i></i></div>
+          <figcaption>네일팁 이미지 2 <span>예시</span></figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>
