@@ -20,19 +20,31 @@ from urllib.parse import parse_qs, urlsplit
 from src.pipelines.serving.mock import generation
 from src.pipelines.serving.mock.signed_url import check_signed_url, signed_url
 from src.pipelines.serving.mock.validation import (
+    MAX_COPY_IMAGES,
     MAX_FILE_BYTES,
     MAX_PHOTOS,
     ApiError,
+    check_copy_images,
+    check_edit_prompts,
     check_photos,
     check_prompt,
 )
 
 # 외부에 포트를 열지 않는다. VM에서는 SSH 포트 전달로만 접속한다.
 HOST = "127.0.0.1"
-# 주소 -> 생성 종류. 두 주소 모두 요청 필드와 입력 검증이 같다.
+# 주소 -> 생성 종류.
+# /generate: 네일 팁 세트 사진 1장으로 이미지를 만든다. 결과 수정 단계도 이미지만 다룬다.
+# /copy: 이미지를 다 고른 뒤 게시 미리보기에서 따로 부른다. 최종 이미지 여러 장으로 문구를 만든다.
 GENERATE_ROUTES = {"/generate": generation.IMAGES, "/copy": generation.COPY}
-# 사진 최대 장수 × 최대 크기에, 텍스트 필드와 multipart 경계 문자열 몫으로 1MB를 더한다.
-MAX_BODY_BYTES = MAX_PHOTOS * MAX_FILE_BYTES + 1024 * 1024
+# 웹 백엔드가 채팅에 저장해 둔 매장 정보. /copy는 이 값을 게시글 본문에 넣는다.
+STORE_FIELDS = ("shop", "instagramId", "businessHours", "booking")
+# 이미지 최대 장수 × 최대 크기에, 텍스트 필드와 multipart 경계 문자열 몫으로 1MB를 더한다.
+# /copy 한도는 장수·용량이 정해지지 않아 임시 값이다.
+EXTRA_BODY_BYTES = 1024 * 1024
+MAX_BODY_BYTES = {
+    generation.IMAGES: MAX_PHOTOS * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
+    generation.COPY: MAX_COPY_IMAGES * MAX_FILE_BYTES + EXTRA_BODY_BYTES,
+}
 QUEUE_FULL_RETRY_AFTER_SECONDS = 10
 RESULT_PATH = re.compile(r"/api/results/([0-9a-f]{32})/([0-9]+)")
 
@@ -47,12 +59,15 @@ def mock_outcome(prompt: str) -> str:
     return generation.SUCCEEDED
 
 
-def parse_form(content_type: str, body: bytes) -> tuple[dict[str, str], list[bytes]]:
-    """multipart/form-data 본문을 텍스트 필드와 images 파일 목록으로 나눈다."""
+def parse_form(content_type: str, body: bytes) -> tuple[dict[str, list[str]], list[bytes]]:
+    """multipart/form-data 본문을 텍스트 필드와 images 파일 목록으로 나눈다.
+
+    같은 이름이 여러 번 올 수 있어서(editPrompts) 텍스트 필드는 값 목록으로 모은다. images는 보낸 순서를 지킨다.
+    """
     message = BytesParser(policy=policy.HTTP).parsebytes(
         f"Content-Type: {content_type}\r\n\r\n".encode() + body
     )
-    fields: dict[str, str] = {}
+    fields: dict[str, list[str]] = {}
     images: list[bytes] = []
     for part in message.iter_parts():
         name = part.get_param("name", header="content-disposition")
@@ -60,8 +75,13 @@ def parse_form(content_type: str, body: bytes) -> tuple[dict[str, str], list[byt
         if name == "images":
             images.append(data)
         elif name:
-            fields[name] = data.decode("utf-8", errors="replace")
+            fields.setdefault(name, []).append(data.decode("utf-8", errors="replace"))
     return fields, images
+
+
+def last_value(fields: dict[str, list[str]], name: str) -> str | None:
+    values = fields.get(name)
+    return values[-1] if values else None
 
 
 def ms_between(start: float, end: float) -> int:
@@ -113,16 +133,23 @@ class MockHandler(BaseHTTPRequestHandler):
             self.send_error_json(error)
 
     def generate(self, kind: str) -> generation.Generation:
-        fields, images = self.read_form()
+        fields, images = self.read_form(MAX_BODY_BYTES[kind])
         # 처리 시간은 요청 본문을 다 받은 뒤부터 잰다. 업로드 시간은 넣지 않는다.
         received_at = time.monotonic()
-        check_photos(images)
-        prompt = check_prompt(fields.get("prompt"))
-        return self.generator.generate(kind, mock_outcome(prompt), received_at)
+        if kind == generation.COPY:
+            # 게시할 최종 이미지 여러 장과, 최초 프롬프트에 더해 수정 단계의 수정 프롬프트도 받는다.
+            check_copy_images(images)
+            check_edit_prompts(fields.get("editPrompts", []))
+        else:
+            check_photos(images)
+        prompt = check_prompt(last_value(fields, "prompt"))
+        # 매장 정보 형식 검사는 웹 백엔드가 한다. 목업은 받은 값을 그대로 쓴다.
+        store = {name: last_value(fields, name) or "" for name in STORE_FIELDS}
+        return self.generator.generate(kind, mock_outcome(prompt), received_at, store)
 
-    def read_form(self) -> tuple[dict[str, str], list[bytes]]:
+    def read_form(self, max_body_bytes: int) -> tuple[dict[str, list[str]], list[bytes]]:
         length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_BODY_BYTES:
+        if length > max_body_bytes:
             # 본문을 읽지 않고 거절하므로 연결을 닫아 남은 데이터가 다음 요청으로 섞이지 않게 한다.
             self.close_connection = True
             raise ApiError("BODY_TOO_LARGE", "요청 크기가 너무 큽니다.", 413)
@@ -135,7 +162,8 @@ class MockHandler(BaseHTTPRequestHandler):
         headers = {}
         if error.status == HTTPStatus.TOO_MANY_REQUESTS:
             headers["Retry-After"] = str(QUEUE_FULL_RETRY_AFTER_SECONDS)
-        self.send_json(error.status, {"code": error.code, "message": error.message}, headers)
+        payload = {"error": {"code": error.code, "field": error.field, "message": error.message}}
+        self.send_json(error.status, payload, headers)
 
     def send_json(self, status: int, payload: dict, headers: dict | None = None) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")

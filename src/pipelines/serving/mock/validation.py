@@ -8,8 +8,11 @@ import struct
 import zlib
 from dataclasses import dataclass
 
-# 웹은 네일 팁 세트 사진 1장을 보낸다.
+# /generate: 웹은 네일 팁 세트 사진 1장을 보낸다.
 MAX_PHOTOS = 1
+# /copy: 게시 미리보기에서 고른 최종 이미지. 생성 결과 최대 장수(가격표 1 + 네일 팁 12)로 임시로 정했다.
+# 장수·용량 한도는 아직 정해지지 않았다. 최종 작업 후 서비스팀과 맞춘다.
+MAX_COPY_IMAGES = 13
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_PROMPT_CHARS = 200
 # 짧은 변이 512px보다 작으면 광고 이미지로 쓰기에 화질이 부족하다.
@@ -25,13 +28,17 @@ JPEG_SOS_MARKER = 0xDA
 
 
 class ApiError(Exception):
-    """API가 돌려주는 오류. code는 화면이 분기할 때 쓰고, message는 사용자에게 그대로 보여 준다. status는 HTTP 상태 번호."""
+    """API가 돌려주는 오류. code는 화면이 분기할 때 쓰고, message는 사용자에게 그대로 보여 준다.
 
-    def __init__(self, code: str, message: str, status: int = 400):
+    status는 HTTP 상태 번호, field는 문제가 된 요청 필드 이름(필드와 관계없는 오류는 None).
+    """
+
+    def __init__(self, code: str, message: str, status: int = 400, field: str | None = None):
         super().__init__(message)
         self.code = code
         self.message = message
         self.status = status
+        self.field = field
 
 
 @dataclass(frozen=True)
@@ -41,22 +48,39 @@ class Photo:
     height: int
 
 
-def check_prompt(prompt: object) -> str:
-    """API 명세대로 앞뒤 공백을 뺀 값으로 비었는지와 길이를 검사한다."""
+def check_prompt(prompt: object, field: str = "prompt") -> str:
+    """앞뒤 공백을 뺀 값으로 비었는지와 길이를 검사한다. 목업은 빈 값을 받지 않는 실제 서비스 규칙을 따른다."""
     text = prompt.strip() if isinstance(prompt, str) else ""
     if not text:
-        raise ApiError("EMPTY_PROMPT", "요청 내용을 입력해 주세요.")
+        raise ApiError("EMPTY_PROMPT", "요청 내용을 입력해 주세요.", field=field)
     if len(text) > MAX_PROMPT_CHARS:
         raise ApiError(
-            "PROMPT_TOO_LONG", f"요청 내용은 {MAX_PROMPT_CHARS}자 이하로 입력해 주세요."
+            "PROMPT_TOO_LONG",
+            f"요청 내용은 {MAX_PROMPT_CHARS}자 이하로 입력해 주세요.",
+            field=field,
         )
     return text
 
 
+def check_edit_prompts(prompts: list[str]) -> list[str]:
+    """수정 단계에서 쓴 수정 프롬프트. 수정하지 않았으면 없어도 되고, 보낸 값은 prompt와 같은 규칙으로 검사한다."""
+    return [check_prompt(prompt, field="editPrompts") for prompt in prompts]
+
+
 def check_photos(photos: list[bytes]) -> list[Photo]:
+    """/generate: 네일 팁 세트 사진 정확히 1장."""
     if len(photos) != MAX_PHOTOS:
-        raise ApiError("PHOTO_COUNT", f"사진은 {MAX_PHOTOS}장만 올릴 수 있습니다.")
+        raise ApiError("PHOTO_COUNT", f"사진은 {MAX_PHOTOS}장만 올릴 수 있습니다.", field="images")
     return [check_photo(photo, number) for number, photo in enumerate(photos, start=1)]
+
+
+def check_copy_images(images: list[bytes]) -> list[Photo]:
+    """/copy: 게시할 최종 이미지 1장 이상, 게시 순서대로."""
+    if not 1 <= len(images) <= MAX_COPY_IMAGES:
+        raise ApiError(
+            "PHOTO_COUNT", f"게시할 이미지는 1~{MAX_COPY_IMAGES}장을 보내 주세요.", field="images"
+        )
+    return [check_photo(image, number) for number, image in enumerate(images, start=1)]
 
 
 def check_photo(data: bytes, number: int) -> Photo:
@@ -65,6 +89,7 @@ def check_photo(data: bytes, number: int) -> Photo:
         raise ApiError(
             "FILE_TOO_LARGE",
             f"{number}번째 사진이 {MAX_FILE_BYTES // (1024 * 1024)}MB를 넘습니다.",
+            field="images",
         )
     if data.startswith(PNG_SIGNATURE):
         fmt, size = "png", read_png_size(data)
@@ -72,11 +97,15 @@ def check_photo(data: bytes, number: int) -> Photo:
         fmt, size = "jpeg", read_jpeg_size(data)
     else:
         raise ApiError(
-            "UNSUPPORTED_FORMAT", f"{number}번째 사진은 PNG 또는 JPG 파일만 올릴 수 있습니다."
+            "UNSUPPORTED_FORMAT",
+            f"{number}번째 사진은 PNG 또는 JPG 파일만 올릴 수 있습니다.",
+            field="images",
         )
     if size is None:
         raise ApiError(
-            "BROKEN_IMAGE", f"{number}번째 사진 파일이 손상되었습니다. 다른 사진을 올려 주세요."
+            "BROKEN_IMAGE",
+            f"{number}번째 사진 파일이 손상되었습니다. 다른 사진을 올려 주세요.",
+            field="images",
         )
     photo = Photo(fmt, *size)
     check_resolution(photo, number)
@@ -126,9 +155,11 @@ def check_resolution(photo: Photo, number: int) -> None:
         raise ApiError(
             "RESOLUTION_TOO_LOW",
             f"{number}번째 사진의 해상도가 너무 낮습니다. 짧은 변이 {MIN_SIDE}px 이상인 사진을 올려 주세요.",
+            field="images",
         )
     if max(photo.width, photo.height) > MAX_SIDE:
         raise ApiError(
             "RESOLUTION_TOO_HIGH",
             f"{number}번째 사진의 해상도가 너무 높습니다. 긴 변이 {MAX_SIDE}px 이하인 사진을 올려 주세요.",
+            field="images",
         )

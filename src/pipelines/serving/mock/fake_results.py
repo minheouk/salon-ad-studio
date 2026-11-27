@@ -37,5 +37,17 @@ def fake_ads(nail_tip_count: int) -> list[dict]:
     return [price_table, *nail_tips]
 
 
-def fake_copy() -> dict:
-    return {"caption": "[목업] 이달의 아트 광고 문구", "hashtags": "#목업 #이달의아트"}
+def fake_copy(store: dict[str, str]) -> dict:
+    """API 명세대로 게시글 본문에 매장명, 인스타그램 계정명, 영업시간, 예약 링크를 모두 넣는다."""
+    shop = store.get("shop", "")
+    caption = "\n".join(
+        [
+            f"[목업] {shop} 이달의 아트",
+            f"인스타그램 @{store.get('instagramId', '')}",
+            f"영업시간 {store.get('businessHours', '')}",
+            f"예약 {store.get('booking', '')}",
+        ]
+    )
+    tags = ["#목업", "#이달의아트"] + ([f"#{shop.replace(' ', '')}"] if shop else [])
+    hashtags = " ".join(tags)
+    return {"caption": caption, "hashtags": hashtags}

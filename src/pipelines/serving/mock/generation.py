@@ -50,6 +50,7 @@ class Generation:
 
 
 def timeout_error() -> ApiError:
+    # 서빙은 TIMEOUT을 보내고, 웹 백엔드가 사용자에게 GENERATION_TIMEOUT으로 바꿔 보낸다.
     return ApiError(
         "TIMEOUT", f"처리 시간이 {SERVER_TIMEOUT_SECONDS}초를 넘었습니다. 다시 시도해 주세요.", 504
     )
@@ -62,27 +63,29 @@ class Generator:
         self.lock = threading.Lock()
         self.generations: dict[str, Generation] = {}
 
-    def generate(self, kind: str, outcome: str, received_at: float) -> Generation:
+    def generate(self, kind: str, outcome: str, received_at: float, store: dict[str, str]) -> Generation:
         """자리가 없으면 바로 거절하고, 있으면 차례를 기다렸다가 생성한다."""
         if not self.slots.acquire(blocking=False):
             raise ApiError(
                 "QUEUE_FULL", "지금 처리 중인 요청이 많습니다. 잠시 후 다시 시도해 주세요.", 429
             )
         try:
-            return self.run_in_turn(kind, outcome, received_at)
+            return self.run_in_turn(kind, outcome, received_at, store)
         finally:
             self.slots.release()
 
-    def run_in_turn(self, kind: str, outcome: str, received_at: float) -> Generation:
+    def run_in_turn(self, kind: str, outcome: str, received_at: float, store: dict[str, str]) -> Generation:
         deadline = received_at + SERVER_TIMEOUT_SECONDS
         if not self.turn.acquire(timeout=max(0.0, deadline - time.monotonic())):
             raise timeout_error()
         try:
-            return self.run(kind, outcome, received_at, deadline)
+            return self.run(kind, outcome, received_at, deadline, store)
         finally:
             self.turn.release()
 
-    def run(self, kind: str, outcome: str, received_at: float, deadline: float) -> Generation:
+    def run(
+        self, kind: str, outcome: str, received_at: float, deadline: float, store: dict[str, str]
+    ) -> Generation:
         """가짜 생성. 실제 서빙에서는 여기서 모델을 부른다."""
         started_at = time.monotonic()
         remaining = max(0.0, deadline - started_at)
@@ -94,7 +97,7 @@ class Generator:
         if outcome == FAILED:
             raise ApiError("GENERATION_FAILED", FAILED_MESSAGES[kind], 502)
         if kind == COPY:
-            return Generation(received_at, started_at, time.monotonic(), copy=fake_copy())
+            return Generation(received_at, started_at, time.monotonic(), copy=fake_copy(store))
         generation = Generation(received_at, started_at, time.monotonic(), results=fake_ads(NAIL_TIP_COUNT))
         # 다운로드할 이미지가 있는 결과만 보관한다.
         with self.lock:
