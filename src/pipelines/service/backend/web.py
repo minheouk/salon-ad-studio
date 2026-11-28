@@ -399,8 +399,8 @@ class WebHandler(SimpleHTTPRequestHandler):
         session = self.session(session_id, lock=True)
         common_prompt = self.edit_prompt(data.get("common_prompt", ""), "common_prompt")
         items = data.get("images")
-        if not isinstance(items, list) or not 1 <= len(items) <= 12:
-            raise ApiError("INVALID_INPUT", "수정할 네일팁 이미지를 1~12장 선택해 주세요.", field="images")
+        if not isinstance(items, list) or not 1 <= len(items) <= 13:
+            raise ApiError("INVALID_INPUT", "수정할 이미지를 1~13장 선택해 주세요.", field="images")
         targets = [self.edit_target(item, common_prompt) for item in items]
         if len({target[0] for target in targets}) != len(targets):
             raise ApiError("INVALID_INPUT", "같은 이미지를 중복 선택할 수 없습니다.", field="images")
@@ -446,13 +446,17 @@ class WebHandler(SimpleHTTPRequestHandler):
                 results.append({"image_id": target[0], "error": body})
         return results
 
-    # 최신 결과 네일팁의 파일과 각 프롬프트를 그대로 전달합니다.
+    # 현재 결과의 이미지 파일과 수정 프롬프트를 전달합니다.
     def edit_item(self, session_id, target, version, active_ids):
         image_id, common_prompt, image_prompt = target
         image = self.store.image(image_id) if image_id in active_ids else None
-        if not image or (image["chat_id"], image["kind"]) != (session_id, "nail_tip"):
-            raise ApiError("INVALID_INPUT", "이 채팅에서 수정할 수 있는 네일팁 이미지를 선택해 주세요.", field="image_id")
+        if not image or image["chat_id"] != session_id or image["kind"] not in ("nail_tip", "price_table"):
+            raise ApiError("INVALID_INPUT", "이 채팅에서 수정할 수 있는 이미지를 선택해 주세요.", field="image_id")
         kind = image["kind"]
+        if kind == "price_table":
+            if not image_prompt:
+                raise ApiError("INVALID_INPUT", "가격표에는 이미지별 수정 프롬프트를 사용해 주세요.", field="image_prompt")
+            common_prompt = ""
         content = self.model.edit(image["content"], common_prompt, image_prompt) if self.model else sample_png(kind, 3 + version)
         return create_image(self.store, session_id, kind, content)
 
@@ -472,6 +476,11 @@ class WebHandler(SimpleHTTPRequestHandler):
         if len(images) != len(image_ids):
             raise ApiError("INVALID_INPUT", "현재 작업에 속한 이미지만 선택해 주세요.", field="image_ids")
         fields = json.loads(session["fields"])
+        submitted = json.loads(session["draft"]).get("submittedFields")
+        if isinstance(submitted, dict):
+            fields.update({name: submitted[name].strip() for name in FIELDS
+                           if name != "prompt" and isinstance(submitted.get(name), str)})
+            validate_fields(fields)
         if self.model:
             shop_fields = {name: fields[name] for name in FIELDS if name != "prompt"}
             return self.model.copy(shop_fields, [images[image_id] for image_id in image_ids])

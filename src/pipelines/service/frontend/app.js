@@ -21,8 +21,20 @@ dialog.innerHTML = `
              pattern="[0-9]{6,10}" maxlength="10" disabled>
       <button class="button button-plain" id="auth-resend" type="button">코드 다시 받기</button>
     </div>
-    <button class="button button-primary auth-action" type="submit">인증 코드 받기</button>
+    <button class="button button-primary button-brand auth-action" type="submit">인증 코드 받기</button>
   </form>
+  <div class="auth-alternative">
+    <div class="auth-divider">또는</div>
+    <button class="button button-outline auth-google" type="button" disabled>
+      <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true" focusable="false">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.2 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.23 5.48-4.74 7.18l7.73 6C44.44 38.03 46.98 31.88 46.98 24.55z"/>
+        <path fill="#FBBC05" d="M10.53 28.59a14.6 14.6 0 0 1 0-9.18l-7.98-6.19a24 24 0 0 0 0 21.56l7.98-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.15 1.45-4.92 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.5 42.62 14.62 48 24 48z"/>
+      </svg>
+      Google로 계속하기
+    </button>
+  </div>
   <button class="button button-plain" id="auth-switch" type="button"></button>
   <p class="auth-status" role="status"></p>
 `;
@@ -37,7 +49,10 @@ const verification = dialog.querySelector("#auth-verification");
 const status = dialog.querySelector(".auth-status");
 const submit = dialog.querySelector(".auth-action");
 const switchMode = dialog.querySelector("#auth-switch");
+const alternative = dialog.querySelector(".auth-alternative");
 const resend = dialog.querySelector("#auth-resend");
+const previewLoginError = document.body.classList.contains("landing-page")
+  && new URLSearchParams(location.search).get("preview") === "login-error";
 let signup;
 let continueToCreate;
 
@@ -45,6 +60,7 @@ let continueToCreate;
 export function showAuth(mode = "로그인", create = false) {
   if (dialog.open || submit.disabled) return;
   signup = mode === "회원가입";
+  alternative.hidden = signup;
   continueToCreate = create;
   dialog.querySelector("#auth-title").textContent = mode;
   switchMode.textContent = signup ? "이미 계정이 있으신가요? 로그인" : "계정이 없으신가요? 회원가입";
@@ -108,6 +124,7 @@ form.addEventListener("submit", (event) => {
     }
     dialog.close();
     if (continueToCreate) location.assign("./create.html");
+    else if (document.body.classList.contains("landing-page")) location.assign("./mypage.html");
     else document.dispatchEvent(new Event("onecut-authenticated"));
   });
 });
@@ -148,7 +165,11 @@ function updateAccountActions() {
   document.querySelectorAll("[data-account]").forEach((node) => { node.hidden = false; });
 }
 document.addEventListener("onecut-authenticated", updateAccountActions);
-if (document.querySelector("[data-guest]")) {
+if (previewLoginError) {
+  showAuth();
+  email.value = "nail@example.com";
+  status.textContent = "이메일 또는 비밀번호를 확인해 주세요.";
+} else if (document.querySelector("[data-guest]")) {
   void request("/api/auth/session", "GET").then(updateAccountActions, () => {});
 }
 
@@ -165,3 +186,32 @@ logoutButton?.addEventListener("click", async () => {
     logoutButton.disabled = false;
   }
 });
+
+// 좁은 화면에서 계정 메뉴의 열림 상태를 관리합니다.
+const menuToggle = document.querySelector(".landing-menu-toggle");
+const accountMenu = document.querySelector("#landing-account");
+if (menuToggle && accountMenu) {
+  const compactHeader = matchMedia("(max-width: 780px)");
+
+  function closeAccountMenu() {
+    menuToggle.setAttribute("aria-expanded", "false");
+  }
+
+  menuToggle.addEventListener("click", () => {
+    const expanded = menuToggle.getAttribute("aria-expanded") === "true";
+    menuToggle.setAttribute("aria-expanded", String(!expanded));
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!menuToggle.contains(event.target) && !accountMenu.contains(event.target)) closeAccountMenu();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !dialog.open && menuToggle.getAttribute("aria-expanded") === "true") {
+      closeAccountMenu();
+      menuToggle.focus();
+    }
+  });
+
+  compactHeader.addEventListener("change", closeAccountMenu);
+}

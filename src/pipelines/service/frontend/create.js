@@ -1,12 +1,13 @@
 import "./app.js";
 import { editAdImages, generateAd, retryDelay } from "./api.js";
 import { listChats, loadChat, saveChat } from "./chats.js";
-import { getPublishDraft, restorePublishDraft, setApiResults } from "./publish.js";
+import { getPublishDraft, restorePublishDraft, setApiResults } from "./publish.js?v=export-selection-count";
 import { describeResultImages } from "./result-images.js";
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const MAX_PROMPT_LENGTH = 200;
 const PHOTO_TYPES = ["image/jpeg", "image/png"];
+const previewFirstResult = new URLSearchParams(location.search).get("preview") === "first-result";
 
 const form = document.querySelector("#create-form");
 const photoInput = document.querySelector("#photo");
@@ -136,12 +137,11 @@ form.addEventListener("submit", (event) => {
   }
   validateShopFields();
   validatePrompt(prompt, promptCount);
-  if (form.reportValidity()) generateExample();
+  if (form.reportValidity()) generateImages();
 });
 
 const createTitle = document.querySelector("#create-title");
 const resultPanel = document.querySelector("#example-results");
-const resultTitle = document.querySelector("#result-title");
 const commonPrompt = document.querySelector("#common-edit-prompt");
 const commonPromptCount = document.querySelector("#common-edit-count");
 const editDialog = document.querySelector("#image-edit-dialog");
@@ -154,13 +154,33 @@ let activeImageIndex;
 let imagePrompts = [];
 let apiResults;
 const resultGrid = document.querySelector(".result-grid");
-const resultCount = document.querySelector("#result-count");
 
-// 이미지 카드에 저장된 개별 수정 지시를 표시합니다.
-function renderPrompt(card, index) {
-  const draft = card.querySelector(".image-edit-draft");
-  draft.textContent = imagePrompts[index] ?? "";
-  draft.hidden = !draft.textContent;
+// 개별 이미지 수정 지시를 공통 입력 영역에서 확인할 수 있게 표시합니다.
+function renderImagePromptSummary(images = describeResultImages(apiResults)) {
+  const items = images.flatMap((image, index) => {
+    const prompt = imagePrompts[index];
+    if (!prompt) return [];
+    const item = document.createElement("li");
+    const text = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = image.title;
+    text.append(title, ` - ${prompt}`);
+    const remove = document.createElement("button");
+    remove.className = "image-prompt-remove";
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `${image.title} 수정 지시 삭제`);
+    remove.addEventListener("click", () => {
+      imagePrompts[index] = "";
+      failedEdits = [];
+      renderImagePromptSummary(images);
+      commonPrompt.focus();
+      scheduleSave();
+    });
+    item.append(text, remove);
+    return [item];
+  });
+  document.querySelector("#image-prompt-summary").replaceChildren(...items);
 }
 
 // 서버가 반환한 이미지와 해당 이미지의 수정 버튼을 카드로 만듭니다.
@@ -171,18 +191,19 @@ function createResultCard(image, index) {
   const picture = document.createElement("img");
   picture.src = image.image_url;
   picture.alt = image.title;
-  visual.append(picture);
+  if (image.image_url) visual.append(picture);
+  else if (previewFirstResult) {
+    visual.append(document.createElement("i"));
+    visual.setAttribute("aria-hidden", "true");
+  }
   const label = document.createElement("figcaption");
   label.textContent = image.title;
   card.append(visual, label);
-  if (image.type === "nail_tip") {
-    const editor = document.createElement("div");
-    editor.className = "result-image-edit";
-    editor.innerHTML = '<p class="image-edit-draft" hidden></p><button class="button button-outline" type="button">이 이미지 수정</button>';
-    editor.querySelector("button").dataset.imageEdit = index;
-    card.append(editor);
-    renderPrompt(card, index);
-  }
+  const editor = document.createElement("div");
+  editor.className = "result-image-edit";
+  editor.innerHTML = '<button class="button button-outline" type="button">이 이미지 수정</button>';
+  editor.querySelector("button").dataset.imageEdit = index;
+  card.append(editor);
   return card;
 }
 
@@ -191,22 +212,16 @@ function showResults() {
   const images = describeResultImages(apiResults);
   setApiResults(apiResults, images);
   resultGrid.replaceChildren(...images.map(createResultCard));
-  resultCount.textContent = `생성 결과 ${images.length}장`;
+  renderImagePromptSummary(images);
   createTitle.hidden = true;
   form.hidden = true;
   resultPanel.hidden = false;
-  resultTitle.focus();
+  resultPanel.focus();
 }
-
-document.querySelector("#back-to-inputs").addEventListener("click", () => {
-  resultPanel.hidden = true;
-  createTitle.hidden = false;
-  form.hidden = false;
-  photoInput.focus();
-});
 
 commonPrompt.addEventListener("input", () => {
   validatePrompt(commonPrompt, commonPromptCount);
+  failedEdits = [];
   scheduleSave();
 });
 imagePrompt.addEventListener("input", () => validatePrompt(imagePrompt, imagePromptCount));
@@ -218,10 +233,9 @@ resultGrid.addEventListener("click", (event) => {
   const visual = card.querySelector(".image-placeholder");
   activeImageIndex = Number(button.dataset.imageEdit);
   selectedImageName.textContent = card.querySelector("figcaption").textContent;
-  selectedImagePreview.replaceChildren(visual.querySelector("img").cloneNode());
-  selectedImagePreview.classList.toggle("alternate", visual.classList.contains("alternate"));
+  selectedImagePreview.replaceChildren(...Array.from(visual.children, (child) => child.cloneNode(true)));
+  selectedImagePreview.className = visual.className;
   imagePrompt.value = imagePrompts[activeImageIndex] ?? "";
-  editStatus.textContent = "";
   validatePrompt(imagePrompt, imagePromptCount);
   editDialog.showModal();
   imagePrompt.focus();
@@ -229,10 +243,8 @@ resultGrid.addEventListener("click", (event) => {
 
 document.querySelector("#cancel-image-edit").addEventListener("click", () => editDialog.close());
 
-const editStatus = document.querySelector("#image-edit-status");
 const batchStatus = document.querySelector("#batch-edit-status");
 const applyEdits = document.querySelector("#apply-edits");
-const retryEdits = document.querySelector("#retry-edits");
 let failedEdits = [];
 let editing = false;
 let editCooldownUntil = 0;
@@ -241,21 +253,18 @@ let editCooldownUntil = 0;
 function saveImagePrompt() {
   if (!imagePrompt.reportValidity()) return false;
   imagePrompts[activeImageIndex] = imagePrompt.value.trim();
-  renderPrompt(resultGrid.children[activeImageIndex], activeImageIndex);
+  failedEdits = [];
+  renderImagePromptSummary();
   scheduleSave();
   return true;
 }
 
-document.querySelector("#save-image-prompt").addEventListener("click", () => {
-  if (saveImagePrompt()) editDialog.close();
-});
-
-// 공통 지시나 개별 지시가 적용되는 네일팁 이미지를 요청 대상으로 모읍니다.
+// 공통 지시를 받을 네일팁과 개별 지시가 있는 이미지를 모읍니다.
 function editTargets() {
   const common = commonPrompt.value.trim();
   return (apiResults?.results ?? []).flatMap((image, index) => {
     const image_prompt = imagePrompts[index] ?? "";
-    if (image.type !== "nail_tip" || (!common && !image_prompt)) return [];
+    if (!image_prompt && !(common && image.type === "nail_tip")) return [];
     return [{ index, image_id: image.image_id, image_prompt }];
   });
 }
@@ -277,12 +286,11 @@ async function submitImageEdits(targets, common, status) {
     return false;
   }
   if (!apiResults || targets.some((target) => !target.image_id)) {
-    status.textContent = "입력 화면에서 이미지를 다시 생성한 뒤 수정해 주세요.";
+    status.textContent = previewFirstResult ? "미리보기에서는 수정 요청을 보내지 않습니다." : "이미지를 다시 생성한 뒤 수정해 주세요.";
     return false;
   }
 
   failedEdits = [];
-  retryEdits.hidden = true;
   status.textContent = `이미지 ${targets.length}장을 수정하고 있습니다…`;
   showEditProgress(true);
   try {
@@ -292,7 +300,7 @@ async function submitImageEdits(targets, common, status) {
     for (const item of response.results) {
       const target = byId.get(item.image_id);
       if (item.image) apiResults.results[target.index] = item.image;
-      else failedEdits.push({ target, common, message: item.error.message });
+      else failedEdits.push({ target, message: item.error.message });
     }
     const delay = Math.max(0, ...response.results.map((item) => retryDelay(item.error?.retry_after)));
     if (delay) {
@@ -302,15 +310,13 @@ async function submitImageEdits(targets, common, status) {
     const completed = targets.length - failedEdits.length;
     const failure = failedEdits.length ? ` 실패 ${failedEdits.length}장. ${failedEdits[0].message}` : "";
     batchStatus.textContent = `수정 완료 ${completed}장.${failure}`;
-    retryEdits.hidden = !failedEdits.length;
     showResults();
     storeDraft();
     return true;
   } catch (error) {
     status.textContent = error.message;
     if (status === batchStatus && (!error.status || [429, 502, 504].includes(error.status))) {
-      failedEdits = targets.map((target) => ({ target, common }));
-      retryEdits.hidden = false;
+      failedEdits = targets.map((target) => ({ target }));
     }
     if (error.retryDelay) {
       editCooldownUntil = Date.now() + error.retryDelay;
@@ -323,28 +329,14 @@ async function submitImageEdits(targets, common, status) {
 }
 
 applyEdits.addEventListener("click", () => {
-  if (commonPrompt.reportValidity()) void submitImageEdits(editTargets(), commonPrompt.value.trim(), batchStatus);
+  if (!commonPrompt.reportValidity()) return;
+  const targets = failedEdits.length ? failedEdits.map(({ target }) => target) : editTargets();
+  void submitImageEdits(targets, commonPrompt.value.trim(), batchStatus);
 });
 
-retryEdits.addEventListener("click", () => {
-  const targets = failedEdits.map(({ target }) => target);
-  void submitImageEdits(targets, failedEdits[0]?.common ?? "", batchStatus);
-});
-
-editForm.addEventListener("submit", async (event) => {
+editForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (!imagePrompt.value.trim()) {
-    editStatus.textContent = "수정 프롬프트를 입력해 주세요.";
-    return;
-  }
-  if (!saveImagePrompt()) return;
-  const index = activeImageIndex;
-  const target = {
-    index,
-    image_id: apiResults?.results[index]?.image_id,
-    image_prompt: imagePrompts[index],
-  };
-  if (await submitImageEdits([target], "", editStatus)) editDialog.close();
+  if (saveImagePrompt()) editDialog.close();
 });
 
 editDialog.addEventListener("cancel", (event) => {
@@ -354,41 +346,147 @@ editDialog.querySelector(".auth-close").addEventListener("click", (event) => {
   if (editing) event.preventDefault();
 });
 
-const generationExample = document.querySelector("#generation-example");
 const generationNotice = document.querySelector("#generation-notice");
 const generationAction = generationNotice.querySelector("button");
 const storageNotice = document.querySelector("#storage-notice");
 const fieldNames = ["shop", "instagramId", "businessHours", "booking", "prompt"];
-const errors = {
-  failed: ["이미지를 생성하지 못했습니다. 첨부 이미지와 입력값은 유지됩니다.", "다시 시도"],
-  size: ["요청 크기가 너무 큽니다. 더 작은 사진으로 바꿔 주세요.", "사진 교체"],
-  format: ["요청을 전송하지 못했습니다. 입력은 유지됩니다. 새로고침한 뒤 다시 시도해 주세요.", ""],
-};
 let retryTimer;
 let generationRetryUntil = 0;
+let replacePhotoAfterError = false;
 let saveTimer;
 let pendingSave = Promise.resolve();
 let chatId = new URLSearchParams(location.search).get("chat");
+const sidebarChatList = document.querySelector("#sidebar-chat-list");
+const sidebarChatStatus = document.querySelector("#sidebar-chat-status");
+const sidebarShop = document.querySelector("#sidebar-shop");
+const sidebarShopForm = document.querySelector("#sidebar-shop-form");
+const sidebarShopEdit = document.querySelector("#edit-sidebar-shop");
+const sidebarShopStatus = document.querySelector("#sidebar-shop-status");
+const submittedPrompt = document.querySelector("#submitted-prompt");
+const SIDEBAR_CHAT_LIMIT = 5;
+let sidebarChats = [];
+let submittedFields;
+
+const sidebarToggle = document.querySelector(".workspace-sidebar-toggle");
+const sidebarMenu = sidebarToggle.parentElement;
+const compactWorkspace = matchMedia("(max-width: 650px)");
+let sidebarPinned = false;
+
+// 좁은 화면에서 마우스로 미리 열거나 버튼으로 열린 상태를 유지합니다.
+function setSidebarExpanded(expanded) {
+  sidebarToggle.setAttribute("aria-expanded", String(expanded));
+}
+
+function closeSidebar() {
+  sidebarPinned = false;
+  setSidebarExpanded(false);
+}
+
+sidebarMenu.addEventListener("pointerenter", (event) => {
+  if (compactWorkspace.matches && event.pointerType === "mouse") setSidebarExpanded(true);
+});
+sidebarMenu.addEventListener("pointerleave", (event) => {
+  if (event.pointerType === "mouse" && !sidebarPinned && !sidebarMenu.contains(document.activeElement)) {
+    setSidebarExpanded(false);
+  }
+});
+sidebarToggle.addEventListener("click", () => {
+  sidebarPinned = !sidebarPinned;
+  setSidebarExpanded(sidebarPinned);
+});
+document.addEventListener("click", (event) => {
+  if (!sidebarMenu.contains(event.target)) closeSidebar();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || sidebarToggle.getAttribute("aria-expanded") !== "true") return;
+  if (sidebarMenu.contains(document.activeElement)) sidebarToggle.focus();
+  closeSidebar();
+});
+compactWorkspace.addEventListener("change", closeSidebar);
+
+// 전송한 매장 정보와 최초 생성 프롬프트를 표시합니다.
+function showSubmittedFields(fields) {
+  submittedFields = fields;
+  for (const item of sidebarShop.querySelectorAll("[data-shop-field]")) {
+    item.textContent = fields[item.dataset.shopField]?.trim() || "—";
+  }
+  submittedPrompt.textContent = fields.prompt ?? "";
+  submittedPrompt.hidden = !submittedPrompt.textContent.trim();
+  sidebarShop.hidden = false;
+}
+
+// 매장 정보 요약 자리에서 저장된 값을 직접 편집합니다.
+function setShopEditing(editing) {
+  sidebarShopForm.hidden = !editing;
+  sidebarShop.querySelector("dl").hidden = editing;
+  sidebarShopEdit.setAttribute("aria-expanded", String(editing));
+  if (!editing) sidebarShopEdit.focus();
+}
+
+sidebarShopEdit.addEventListener("click", () => {
+  if (!sidebarShopForm.hidden) return setShopEditing(false);
+  for (const field of sidebarShopForm.querySelectorAll("input")) {
+    field.value = submittedFields[field.name] ?? "";
+  }
+  sidebarShopStatus.textContent = "";
+  setShopEditing(true);
+  sidebarShopForm.elements.shop.focus();
+});
+document.querySelector("#cancel-sidebar-shop").addEventListener("click", () => setShopEditing(false));
+sidebarShopForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fields = { ...submittedFields };
+  for (const input of sidebarShopForm.querySelectorAll("input")) {
+    input.value = input.value.trim();
+    fields[input.name] = input.value;
+  }
+  if (!sidebarShopForm.reportValidity()) return;
+  if (fields.instagramId.startsWith("@") || !/^https?:\/\/[^\s/?#]+/i.test(fields.booking)) {
+    sidebarShopStatus.textContent = "계정명은 @ 없이, 예약 링크는 http:// 또는 https://로 입력해 주세요.";
+    return;
+  }
+  const controls = Array.from(sidebarShopForm.elements);
+  controls.forEach((control) => { control.disabled = true; });
+  sidebarShopEdit.disabled = true;
+  const saved = previewFirstResult || await storeDraft(fields);
+  controls.forEach((control) => { control.disabled = false; });
+  sidebarShopEdit.disabled = false;
+  if (!saved) {
+    sidebarShopStatus.textContent = "매장 정보를 저장하지 못했습니다. 다시 시도해 주세요.";
+    return;
+  }
+  for (const input of sidebarShopForm.querySelectorAll("input")) form.elements[input.name].value = fields[input.name];
+  showSubmittedFields(fields);
+  setShopEditing(false);
+});
+
+// 채팅 목록에서 현재 작업을 표시하고 기존 복원 경로로 연결합니다.
+function renderSidebarChats(chats) {
+  sidebarChats = chats;
+  const items = chats.slice(0, SIDEBAR_CHAT_LIMIT).map((chat) => {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = `./create.html?chat=${encodeURIComponent(chat.id)}`;
+    link.textContent = chat.fields.shop?.trim() || "제목 없는 광고";
+    if (chat.id === chatId) link.setAttribute("aria-current", "page");
+    item.append(link);
+    return item;
+  });
+  sidebarChatList.replaceChildren(...items);
+  sidebarChatStatus.textContent = chats.length ? "" : "채팅 내역이 없습니다.";
+}
 let hasResults = false;
 
 // 현재 입력으로 이미지 생성을 요청하고 결과나 재시도 안내를 표시합니다.
-async function generateExample() {
+async function generateImages() {
   if (Date.now() < generationRetryUntil) return;
-  clearTimeout(retryTimer);
-  generationNotice.hidden = true;
-  const state = generationExample.value;
-  if (errors[state]) {
-    const [message, action] = errors[state];
-    generationNotice.querySelector("p").textContent = message;
-    generationAction.textContent = action;
-    generationAction.hidden = !action;
-    generationAction.disabled = false;
-    generationNotice.hidden = false;
-    return;
-  }
   const button = form.querySelector('button[type="submit"]');
   if (button.disabled) return;
+  clearTimeout(retryTimer);
+  generationNotice.hidden = true;
   const body = new FormData(form);
+  showSubmittedFields(Object.fromEntries(fieldNames.map((name) => [name, body.get(name)])));
+  scheduleSave();
   chatId ??= crypto.randomUUID();
   body.append("session_id", chatId);
   const photo = selectedPhoto;
@@ -397,7 +495,7 @@ async function generateExample() {
   button.textContent = "생성 중…";
   try {
     const generation = pendingSave.then(async () => {
-      const result = await generateAd(body, state);
+      const result = await generateAd(body);
       savedPhoto = photo;
       return result;
     });
@@ -405,14 +503,14 @@ async function generateExample() {
     apiResults = await generation;
     imagePrompts = apiResults.results.map((_, index) => imagePrompts[index] ?? "");
     failedEdits = [];
-    retryEdits.hidden = true;
     batchStatus.textContent = "";
     hasResults = true;
     showResults();
     storeDraft();
   } catch (error) {
     generationNotice.querySelector("p").textContent = error.message;
-    generationAction.textContent = "다시 시도";
+    replacePhotoAfterError = error.status === 413;
+    generationAction.textContent = replacePhotoAfterError ? "사진 교체" : "다시 시도";
     generationAction.hidden = false;
     generationAction.disabled = Boolean(error.retryDelay);
     generationNotice.hidden = false;
@@ -432,11 +530,10 @@ async function generateExample() {
 }
 
 generationAction.addEventListener("click", () => {
-  if (generationExample.value === "size") {
+  if (replacePhotoAfterError) {
     photoInput.click();
     return;
   }
-  generationExample.value = "success";
   form.requestSubmit();
 });
 
@@ -447,31 +544,37 @@ function scheduleSave() {
 }
 
 // 현재 초안의 스냅샷을 만들고 앞선 저장이 끝난 뒤 서버에 보냅니다.
-function storeDraft() {
+function storeDraft(shopUpdate) {
   clearTimeout(saveTimer);
   saveTimer = undefined;
+  if (previewFirstResult) return pendingSave;
   const fields = Object.fromEntries(fieldNames.map((name) => [name, form.elements[name].value]));
+  if (shopUpdate) for (const input of sidebarShopForm.querySelectorAll("input")) fields[input.name] = shopUpdate[input.name];
   if (!chatId && !selectedPhoto && !Object.values(fields).some((value) => value.trim())) return;
 
   chatId ??= crypto.randomUUID();
   const chat = {
-    id: chatId, fields, photo: selectedPhoto,
+    id: chatId, fields, photo: selectedPhoto, submittedFields: shopUpdate ?? submittedFields,
     commonPrompt: commonPrompt.value, imagePrompts: (apiResults?.results ?? []).flatMap((image, index) =>
       image.type === "nail_tip" ? [imagePrompts[index] ?? ""] : []),
+    priceTablePrompt: imagePrompts[(apiResults?.results ?? []).findIndex((image) => image.type === "price_table")] ?? "",
     publishDraft: getPublishDraft(),
   };
   pendingSave = pendingSave.then(async () => {
     try {
       await saveChat(chat, savedPhoto);
       savedPhoto = chat.photo;
+      renderSidebarChats([{ id: chat.id, fields }, ...sidebarChats.filter((entry) => entry.id !== chat.id)]);
       const page = new URL(location.href);
       if (!page.searchParams.has("chat")) {
         page.searchParams.set("chat", chat.id);
         history.replaceState(null, "", page);
       }
       storageNotice.textContent = "";
+      return true;
     } catch {
       storageNotice.textContent = "채팅을 저장하지 못했습니다.";
+      return false;
     }
   });
   return pendingSave;
@@ -481,6 +584,7 @@ function storeDraft() {
 async function restoreChat() {
   try {
     const { chats, chatLimit } = await listChats();
+    renderSidebarChats(chats);
     if (!chatId && chats.length >= chatLimit) {
       location.replace("./mypage.html?new");
       return;
@@ -490,6 +594,12 @@ async function restoreChat() {
       storageNotice.textContent = "이 계정에서 해당 채팅을 찾을 수 없습니다.";
       return;
     }
+  } catch {
+    sidebarChatStatus.textContent = "채팅 내역을 불러오지 못했습니다.";
+    return;
+  }
+
+  try {
     const chat = await loadChat(chatId);
     for (const name of fieldNames) form.elements[name].value = chat.fields[name] ?? "";
     if (chat.photo) selectPhoto([chat.photo], { restored: true });
@@ -500,9 +610,11 @@ async function restoreChat() {
     validatePrompt(commonPrompt, commonPromptCount);
     let promptIndex = 0;
     imagePrompts = (apiResults?.results ?? []).map((image) =>
-      image.type === "nail_tip" ? (chat.imagePrompts?.[promptIndex++] ?? "") : "");
+      image.type === "price_table" ? (chat.priceTablePrompt ?? "") : (chat.imagePrompts?.[promptIndex++] ?? ""));
     restorePublishDraft(chat.publishDraft ?? { caption: chat.caption });
+    if (chat.submittedFields || hasResults) showSubmittedFields(chat.submittedFields ?? chat.fields);
     if (hasResults) showResults();
+    storageNotice.textContent = "";
   } catch {
     storageNotice.textContent = "저장한 채팅을 불러오지 못했습니다.";
   }
@@ -518,4 +630,22 @@ document.addEventListener("click", async (event) => {
   location.assign(link.href);
 });
 document.addEventListener("onecut-authenticated", restoreChat);
-void restoreChat();
+if (previewFirstResult) {
+  const fields = {
+    shop: "원컷 네일샵", instagramId: "onecut_nail", businessHours: "화~일 11:00–20:00",
+    booking: "https://example.com/booking", prompt: "3세트(팁 15개), 왼쪽부터 39,000원 / 49,000원 / 59,000원",
+  };
+  showSubmittedFields(fields);
+  sidebarChatStatus.textContent = "채팅 내역이 없습니다.";
+  apiResults = {
+    results: [{ type: "price_table" }, ...Array.from({ length: 3 }, () => ({ type: "nail_tip" }))],
+    previewCopy: {
+      caption: "원컷 네일샵의 이달의 아트를 소개합니다 💅\n왼쪽부터 39,000원, 49,000원, 59,000원이에요.\n화~일 11:00–20:00 · 예약 문의 @onecut_nail",
+      hashtags: "#원컷네일샵 #이달의아트 #네일아트 #네일디자인",
+    },
+  };
+  hasResults = true;
+  showResults();
+} else {
+  void restoreChat();
+}

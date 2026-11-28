@@ -7,6 +7,9 @@
   --muted: #615b69;
   --line: #ded9e4;
   --accent: #6947b5;
+  --onecut-gradient: linear-gradient(110deg, #cf5500, #cd256d 54%, #7736d5);
+  --onecut-wordmark-gradient: linear-gradient(110deg, #e86d09, #d62479 54%, #8537dd);
+  --onecut-canvas: #f5f1fc;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -45,7 +48,29 @@ a { color: inherit; }
   white-space: nowrap;
 }
 
-.brand-mark { color: var(--accent); }
+.brand-wordmark {
+  width: fit-content;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -.045em;
+  color: #ad245e;
+}
+@supports (background-clip: text) {
+  .brand-wordmark {
+    background-image: var(--onecut-wordmark-gradient);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+@media (forced-colors: active) {
+  .brand-wordmark { -webkit-text-fill-color: currentColor; }
+}
+.brand-mark {
+  color: var(--accent);
+  background: linear-gradient(135deg, #f48226 8%, #e83c83 50%, #7442ca 88%);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 .site-header nav { display: flex; gap: 8px; }
 
 /* 공통 버튼의 크기와 정렬, 종류별 색상과 호버 상태를 설정합니다. */
@@ -69,6 +94,8 @@ a { color: inherit; }
 .button-outline { border-color: var(--line); background: #fff; color: inherit; }
 .button-primary { background: #292033; color: #fff; padding: 12px 19px; }
 .button-primary:hover { background: #49385a; }
+.button-primary.button-brand { background: var(--onecut-gradient); }
+.button-primary.button-brand:hover { filter: brightness(.9); }
 
 /* 랜딩의 핵심 메시지와 주요 행동 버튼 영역을 배치합니다. */
 .hero {
@@ -176,16 +203,22 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 
 .auth-close:hover { background: #eee8f6; }
 .auth-action { width: 100%; }
+.auth-alternative { display: grid; gap: 14px; margin: 16px 0 6px; }
+.auth-alternative[hidden] { display: none; }
+.auth-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .8rem; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.auth-dialog .auth-google { width: 100%; color: #211c27; font-weight: 750; }
+.auth-dialog .auth-google:disabled { opacity: 1; }
 
 /* 인증 입력 필드와 상태 안내 문구를 정렬합니다. */
 .auth-email { display: grid; gap: 9px; }
 .auth-email label { font-size: .88rem; font-weight: 700; }
+.auth-email label:is([for="auth-email"], [for="auth-password"]) { color: var(--muted); font-weight: 500; }
+.auth-email input, .auth-dialog .auth-google { border: 1px solid var(--line); border-radius: 9px; }
 .auth-email input {
   width: 100%;
   min-width: 0;
   padding: 11px 12px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
   background: #fff;
   color: inherit;
   font: inherit;
@@ -227,7 +260,57 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 .create-sidebar { padding: 16px 12px; }
 .create-sidebar nav { display: grid; gap: 4px; margin-top: 14px; }
 .create-sidebar nav .button { justify-content: flex-start; }
+.sidebar-history { width: 100%; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.sidebar-history h2 { margin: 0 0 8px; font-size: .92rem; }
+.sidebar-history ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.sidebar-history a { display: block; padding: 8px; border-radius: 8px; overflow-wrap: anywhere; font-size: .88rem; text-decoration: none; }
+.sidebar-history a:hover, .sidebar-history a[aria-current="page"] { background: #f1ebfc; }
+.sidebar-history p { margin: 0; color: var(--muted); font-size: .82rem; }
 .create-main { min-width: 0; padding: clamp(16px, 4vw, 28px); }
+.ad-workspace {
+  grid-template-columns: clamp(185px, 19vw, 260px) minmax(0, 1fr);
+  gap: 0;
+  max-width: none;
+  min-height: 100svh;
+  padding: 0;
+  background: var(--onecut-canvas);
+}
+.ad-workspace .create-sidebar nav .button { justify-content: center; }
+.ad-workspace .photo-drop { border-color: #af95e2; background: #f7f3fd; }
+.brand-title-accent { color: #a72db0; }
+@supports (background-clip: text) {
+  .brand-title-accent {
+    background-image: linear-gradient(105deg, #d1267a, #8239dd);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+@media (forced-colors: active) {
+  .brand-title-accent { -webkit-text-fill-color: currentColor; }
+}
+.ad-workspace .create-sidebar { border: 0; border-inline-end: 1px solid var(--line); border-radius: 0; padding: 20px clamp(12px, 2vw, 24px); }
+.workspace-sidebar { display: contents; }
+.workspace-sidebar-toggle { display: none; }
+.ad-workspace .create-main { border: 0; border-radius: 0; background: transparent; padding: clamp(20px, 5vw, 72px); }
+.ad-workspace :is(#create-title, .create-form, .result-panel) { max-width: 840px; margin-inline: auto; }
+.ad-workspace #create-title { text-align: center; }
+.sidebar-shop { width: 100%; margin-top: 20px; }
+.sidebar-shop-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.sidebar-shop h2 { margin: 0; font-size: .92rem; }
+.sidebar-shop-heading .button { padding: 5px; color: var(--accent); font-size: .78rem; }
+.sidebar-shop dl { display: grid; gap: 4px; margin: 0; font-size: .85rem; }
+.sidebar-shop dl[hidden] { display: none; }
+.sidebar-shop dt { color: var(--muted); font-size: .75rem; }
+.sidebar-shop dd { margin: 0 0 8px; font-weight: 650; overflow-wrap: anywhere; }
+.sidebar-shop-form { display: grid; gap: 8px; }
+.sidebar-shop-form[hidden] { display: none; }
+.sidebar-shop-form label { display: grid; gap: 4px; font-size: .78rem; }
+.sidebar-shop-form input { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.sidebar-shop-form input:focus { border-color: var(--accent); outline: none; }
+.sidebar-shop-form .button { padding: 7px 10px; }
+.sidebar-shop-form p { margin: 0; font-size: .8rem; }
+.prompt-example { margin: 0; color: var(--muted); font-size: .875rem; }
+.submitted-prompt { justify-self: end; max-width: 85%; margin: 0; padding: 10px 16px; border-radius: 16px; background: #eee5fa; white-space: pre-wrap; overflow-wrap: anywhere; }
 .create-main h1 {
   margin: 0 0 20px;
   font-size: clamp(1.7rem, 5vw, 2.6rem);
@@ -237,7 +320,7 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 /* 광고 생성 양식과 입력 항목 간격을 설정합니다. */
 .create-form { display: grid; gap: 22px; }
 .create-field { display: grid; align-content: start; gap: 7px; min-width: 0; }
-.create-field > label:not(.photo-drop), .shop-fields legend { font-weight: 760; }
+.create-field > label:not(.photo-drop) { font-weight: 760; }
 
 /* 사진 첨부 영역, 드래그 상태, 첨부 미리보기와 오류를 표시합니다. */
 .photo-drop {
@@ -266,7 +349,6 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 
 /* 매장 정보 입력 그리드와 프롬프트 입력창, 실행 버튼을 정렬합니다. */
 .shop-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
-.shop-fields legend { margin-bottom: 10px; padding: 0; }
 .shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .shop-grid label { font-size: .87rem; }
 .create-field input:not(.photo-input), .create-field textarea {
@@ -283,11 +365,40 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 .create-field textarea { resize: vertical; }
 .prompt-meta, .create-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .prompt-meta output { white-space: nowrap; }
+.initial-prompt-meta { justify-content: flex-end; }
 .create-actions { justify-content: flex-end; flex-wrap: wrap; }
+.ad-workspace .create-form .create-actions { justify-content: center; }
+.ad-workspace .create-form .button-brand { width: min(100%, 290px); }
 
 /* 좁은 화면에서 작업 레이아웃과 카드 그리드의 열 수를 조정합니다. */
 @media (max-width: 650px) {
   .create-layout { grid-template-columns: minmax(0, 1fr); }
+  .ad-workspace .create-main { padding-top: 62px; }
+  .workspace-sidebar { display: block; position: fixed; inset: 8px auto auto 0; z-index: 3; }
+  .workspace-sidebar-toggle {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 0 10px 10px 0;
+    background: #fff;
+    color: inherit;
+    cursor: pointer;
+  }
+  .workspace-sidebar .create-sidebar {
+    display: none;
+    position: absolute;
+    inset: 0 auto auto 100%;
+    width: min(250px, calc(100vw - 56px));
+    max-height: calc(100dvh - 16px);
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 0 12px 12px 12px;
+    box-shadow: 0 12px 30px #26174524;
+  }
+  .workspace-sidebar-toggle[aria-expanded="true"] + .create-sidebar { display: block; }
+  .workspace-sidebar .create-sidebar nav { display: grid; margin-top: 14px; }
   .create-sidebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
   .create-sidebar nav { display: flex; flex-wrap: wrap; margin: 0; }
   .create-sidebar nav .button { padding-inline: 8px; }
@@ -300,16 +411,19 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 
 /* 생성 결과의 제목과 이미지 카드, 개별 수정 지시를 배치합니다. */
 .result-panel { display: grid; gap: 22px; }
-.result-header { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
-.result-header h1 { margin-bottom: 5px; }
-.result-header p, .result-note { color: var(--muted); font-size: .87rem; }
-.result-grid { align-items: start; }
+.result-grid { align-items: stretch; }
+.result-grid figure { display: flex; flex-direction: column; background: #fff; }
+.result-grid .result-image-edit { margin-top: auto; }
 .result-grid .image-placeholder { aspect-ratio: 1 / 1; }
 .result-image-edit { display: grid; gap: 8px; padding: 0 10px 10px; }
 .result-image-edit .button { white-space: normal; padding-inline: 6px; }
-.image-edit-draft { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.image-prompt-summary { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.image-prompt-summary:empty { display: none; }
+.image-prompt-summary li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 8px 4px 12px; border-radius: 8px; background: #eee5fa; overflow-wrap: anywhere; }
+.image-prompt-remove { flex: 0 0 32px; min-height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 1.2rem; cursor: pointer; }
+.image-prompt-remove:hover { background: #e0d3f0; color: inherit; }
 /* 이미지 수정 팝업의 너비와 선택 이미지 미리보기를 설정합니다. */
-.image-edit-dialog { width: min(100% - 32px, 450px); }
+.image-edit-dialog { width: min(100% - 32px, 450px); background: var(--onecut-canvas); }
 .image-edit-preview { display: grid; justify-items: center; gap: 6px; margin-bottom: 16px; font-weight: 700; }
 .image-edit-preview .image-placeholder { width: 112px; aspect-ratio: 1 / 1; border-radius: 8px; }
 .image-edit-dialog .create-actions { margin-top: 8px; }
@@ -330,22 +444,53 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 .export-option[aria-pressed="true"] { border-color: var(--accent); background: #f3edf9; }
 .selection-order { color: var(--muted); font-size: .8rem; }
 /* 게시 미리보기에서 이미지 순서와 이동 버튼을 배치합니다. */
-.publish-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0; list-style: none; }
-.publish-images li { text-align: center; }
+.publish-images { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 4px; list-style: none; }
+#publish-dialog :is(#publish-caption, .publish-images) {
+  --publish-scroll-thumb: #a4a0a8;
+  scrollbar-width: thin;
+  scrollbar-color: var(--publish-scroll-thumb) transparent;
+}
+#publish-dialog .publish-images:not(.show-scrollbar) { --publish-scroll-thumb: transparent; }
+#publish-dialog :is(#publish-caption, .publish-images)::-webkit-scrollbar { width: 8px; height: 8px; }
+#publish-dialog :is(#publish-caption, .publish-images)::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--publish-scroll-thumb);
+}
+.publish-images li { flex: 0 0 clamp(128px, 31%, 216px); min-width: 0; text-align: center; scroll-snap-align: start; }
 .publish-images li > span:not(.image-placeholder) { display: block; margin: 6px 0; font-size: .8rem; }
 .publish-images button { padding: 4px 8px; margin: 0 2px; }
 /* 게시 실패 화면에서 문구의 줄바꿈을 유지해 표시합니다. */
 #failure-caption { padding: 10px; background: #f3edf9; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+#publish-success h2 { text-align: center; }
+#publish-success .workflow-actions { justify-content: center; }
+#close-publish-success { min-width: 88px; min-height: 36px; padding: 6px 14px; font-size: 14px; }
 /* 마이페이지 채팅 목록과 관리 버튼, 삭제 대상 선택지를 정렬합니다. */
 .chat-list { padding: 0; list-style: none; }
 .chat-list li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line); }
 .chat-list li p { margin-top: 4px; font-size: .85rem; color: var(--muted); }
 .chat-list .workflow-actions { margin: 0; }
+.history-content { max-width: 840px; margin-inline: auto; }
+.history-workspace .create-sidebar [aria-current="page"] { background: #eee5fa; }
+.instagram-account-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-block: 16px; border-block: 1px solid var(--line); }
+.instagram-account-row[hidden] { display: none; }
+.history-workspace .chat-list li { align-items: center; padding-block: 16px; }
+.history-workspace .chat-list li:last-child { border-bottom: 1px solid var(--line); }
+.history-workspace .chat-list .chat-dates { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.history-workspace .chat-list [aria-disabled="true"] { opacity: .55; }
+.history-workspace .chat-list .chat-remove { color: #9e3047; }
+@media (max-width: 650px) {
+  .history-workspace .create-main { padding-top: 24px; }
+}
 .chat-limit-options { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 8px; }
 .chat-limit-options label { display: flex; align-items: center; gap: 6px; }
 
 /* 게시글 문구 영역의 조작 버튼을 양쪽에 배치합니다. */
-.caption-actions { justify-content: space-between; margin-top: 0; }
+.publish-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.publish-section-heading > p { margin: 0; color: var(--muted); }
+.publish-section-heading > label { font-weight: 760; }
+.publish-section-heading > .button { margin-inline-start: auto; }
+#export-dialog .publish-section-heading { margin-bottom: 10px; }
+#export-count { margin-inline-start: auto; color: var(--muted); white-space: nowrap; }
 
 /* 결과 카드와 내보내기, 게시 미리보기의 실제 이미지 크기를 맞춥니다. */
 .result-grid .image-placeholder img,

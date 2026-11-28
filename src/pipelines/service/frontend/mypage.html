@@ -5,23 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>채팅 내역 | 원컷 네일</title>
   <link rel="stylesheet" href="./styles.css">
-  <script src="./mypage.js" type="module"></script>
+  <script src="./mypage.js?v=chat-limit-multiple" type="module"></script>
 </head>
 <body>
-  <div class="create-layout">
+  <div class="create-layout ad-workspace history-workspace">
     <aside class="create-sidebar">
-      <a class="brand" href="./"><span class="brand-mark" aria-hidden="true">✳</span> 원컷 네일</a>
+      <a class="brand brand-wordmark" href="./" aria-label="원컷 네일 홈">onecut</a>
       <nav aria-label="작업 메뉴">
-        <a class="button button-outline" href="./create.html" id="new-chat">새 광고 만들기</a>
-        <a class="button button-plain" href="./mypage.html" aria-current="page">마이페이지</a>
+        <a class="button button-primary button-brand" href="./create.html" id="new-chat"><span aria-hidden="true">+</span> 새 광고 만들기</a>
+        <a class="button button-plain" id="chat-history-menu" href="./mypage.html" aria-current="page">채팅 내역</a>
+        <a class="button button-plain" id="instagram-account-menu" href="./mypage.html?section=instagram">인스타그램 계정</a>
       </nav>
     </aside>
     <main class="create-main">
-      <h1>채팅 내역</h1>
-      <p id="chat-count" class="preview-note"></p>
-      <p class="preview-note" id="chat-retention"></p>
-      <ul id="chat-list" class="chat-list"></ul>
-      <p id="chat-notice" role="status"></p>
+      <div class="history-content" id="chat-history-content">
+        <h1>채팅 내역</h1>
+        <p id="chat-count" class="preview-note"></p>
+        <p class="preview-note" id="chat-retention"></p>
+        <ul id="chat-list" class="chat-list"></ul>
+        <p id="chat-notice" role="status"></p>
+      </div>
+      <section class="history-content instagram-account" id="instagram-account-content" aria-labelledby="instagram-account-title" hidden>
+        <h1 id="instagram-account-title">인스타그램 계정</h1>
+        <p class="preview-note">게시물을 올릴 인스타그램 계정 1개를 연결할 수 있습니다.</p>
+        <div class="instagram-account-row" id="instagram-disconnected">
+          <div>
+            <strong>연결된 계정이 없습니다.</strong>
+            <p class="preview-note">인스타그램 연결을 준비 중입니다.</p>
+          </div>
+          <button class="button button-primary button-brand" type="button" disabled>인스타그램 연결하기</button>
+        </div>
+        <div class="instagram-account-row" id="instagram-connected" hidden>
+          <div>
+            <strong>@onecut_nail</strong>
+            <p class="preview-note">연결된 계정 예시</p>
+          </div>
+          <button class="button button-outline" id="disconnect-instagram-preview" type="button">연결 해제</button>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -31,17 +52,17 @@
     <p>삭제한 채팅은 복구할 수 없습니다.</p>
     <form method="dialog" class="workflow-actions">
       <button class="button button-outline" value="cancel">취소</button>
-      <button class="button button-primary" value="delete">채팅 삭제</button>
+      <button class="button button-primary button-brand" value="delete">채팅 삭제</button>
     </form>
   </dialog>
   <dialog class="auth-dialog workflow-dialog" id="chat-limit" aria-labelledby="chat-limit-title">
     <h2 id="chat-limit-title">채팅 저장 한도에 도달했습니다</h2>
-    <p>새 광고를 만들려면 삭제할 채팅을 선택해 주세요.</p>
+    <p>새 광고를 만들려면 삭제할 채팅을 한 개 이상 선택해 주세요.</p>
     <form id="chat-limit-form">
       <fieldset id="chat-limit-options" class="chat-limit-options"><legend>삭제할 채팅</legend></fieldset>
       <div class="workflow-actions">
         <button class="button button-outline" id="cancel-limit" type="button">취소</button>
-        <button class="button button-primary" type="submit">삭제하고 새 광고 만들기</button>
+        <button class="button button-primary button-brand" id="confirm-chat-limit" type="submit" disabled>삭제하고 새 광고 만들기</button>
       </div>
     </form>
   </dialog>

@@ -8,11 +8,30 @@ const success = document.querySelector("#publish-success");
 const failure = document.querySelector("#publish-failure");
 const options = document.querySelector("#export-options");
 const sequence = document.querySelector("#publish-images");
+let scrollbarTimer;
+
+// 포인터가 들어오거나 이미지가 움직이면 스크롤바를 잠시 표시합니다.
+function revealImageScrollbar() {
+  sequence.classList.add("show-scrollbar");
+  clearTimeout(scrollbarTimer);
+  scrollbarTimer = setTimeout(() => sequence.classList.remove("show-scrollbar"), 1000);
+}
+
+sequence.addEventListener("pointerenter", revealImageScrollbar);
+sequence.addEventListener("scroll", revealImageScrollbar, { passive: true });
+sequence.addEventListener("wheel", (event) => {
+  if (event.ctrlKey || !event.shiftKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+  const maxScroll = sequence.scrollWidth - sequence.clientWidth;
+  if (maxScroll <= 1 || (event.deltaY < 0 && sequence.scrollLeft <= 1)
+      || (event.deltaY > 0 && sequence.scrollLeft >= maxScroll - 1)) return;
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? sequence.clientWidth : 1;
+  event.preventDefault();
+  sequence.scrollLeft += event.deltaY * unit;
+}, { passive: false });
 const caption = document.querySelector("#publish-caption");
 const confirmSelection = document.querySelector("#confirm-export");
 const selected = [];
 const copyStatus = document.querySelector("#preview-copy-status");
-const copyExample = document.querySelector("#copy-example");
 const retryCopy = document.querySelector("#retry-copy");
 const publishButton = document.querySelector("#publish");
 let captionSource = "";
@@ -55,8 +74,7 @@ async function generateExampleCaption({ save = true } = {}) {
   updateCopyControls();
   try {
     if (!apiResults) throw new Error("입력 화면에서 이미지를 다시 생성해 주세요.");
-    if (copyExample.value === "failure") throw new Error("게시글 문구 생성 실패 예시입니다.");
-    const response = await createCaption(apiResults.session_id, imageIds, copyExample.value);
+    const response = apiResults.previewCopy ?? await createCaption(apiResults.session_id, imageIds);
     if (request !== copyRequest) return;
     caption.value = [response.caption, response.hashtags].filter(Boolean).join("\n\n");
     captionSource = JSON.stringify(imageIds);
@@ -90,17 +108,21 @@ function thumbnail(image) {
   const item = document.createElement("span");
   item.className = `image-placeholder ${image.style}`;
   item.setAttribute("aria-hidden", "true");
-  const picture = document.createElement("img");
-  picture.src = image.image_url;
-  picture.alt = "";
-  item.append(picture);
+  if (image.image_url) {
+    const picture = document.createElement("img");
+    picture.src = image.image_url;
+    picture.alt = "";
+    item.append(picture);
+  } else {
+    item.append(document.createElement("i"));
+  }
   return item;
 }
 
 // 이미지 선택 순번과 선택 장수를 표시하고 확인 버튼을 갱신합니다.
 function updateSelection() {
-  document.querySelector("#export-count").textContent = `선택 ${selected.length}장`;
-  confirmSelection.disabled = !selected.length;
+  document.querySelector("#export-count").textContent = `${selected.length}장 선택됨`;
+  confirmSelection.disabled = !selected.length || !(apiResults?.session_id || apiResults?.previewCopy);
   for (const button of options.querySelectorAll("button")) {
     const order = selected.indexOf(Number(button.dataset.index));
     button.setAttribute("aria-pressed", String(order !== -1));
@@ -175,7 +197,7 @@ function renderSequence() {
     const item = document.createElement("li");
     item.draggable = selected.length > 1;
     const title = document.createElement("span");
-    title.textContent = `${position + 1}. ${images[index].title}`;
+    title.textContent = `${position + 1}페이지 · ${images[index].title}`;
     item.append(thumbnail(images[index]), title, moveButton(position, -1), moveButton(position, 1));
     item.addEventListener("dragstart", (event) => event.dataTransfer.setData("text/plain", String(position)));
     item.addEventListener("dragover", (event) => event.preventDefault());
@@ -193,6 +215,7 @@ function openPreview() {
   renderSequence();
   selection.close();
   preview.showModal();
+  sequence.scrollLeft = 0;
   if (!captionSource && !caption.value.trim()) {
     void generateExampleCaption({ save: false });
   } else {
@@ -220,10 +243,13 @@ caption.addEventListener("input", () => {
   notifyDraftChange();
 });
 retryCopy.addEventListener("click", () => {
-  if (["queue", "timeout"].includes(copyExample.value)) copyExample.value = "success";
   void generateExampleCaption();
 });
-preview.addEventListener("close", stopCopyPreview);
+preview.addEventListener("close", () => {
+  stopCopyPreview();
+  clearTimeout(scrollbarTimer);
+  sequence.classList.remove("show-scrollbar");
+});
 document.querySelector("#open-export").addEventListener("click", () => selection.showModal());
 document.querySelector("#cancel-export").addEventListener("click", () => selection.close());
 confirmSelection.addEventListener("click", openPreview);
@@ -235,7 +261,7 @@ document.querySelector("#back-to-export").addEventListener("click", () => {
 
 document.querySelector("#publish").addEventListener("click", () => {
   preview.close();
-  if (document.querySelector("#publish-example").value === "success") {
+  if (apiResults?.previewCopy) {
     success.showModal();
     return;
   }
@@ -248,6 +274,7 @@ document.querySelector("#publish").addEventListener("click", () => {
   }));
   failure.showModal();
 });
+document.querySelector("#close-publish-success").addEventListener("click", () => success.close());
 
 document.querySelector("#back-to-preview").addEventListener("click", () => {
   failure.close();

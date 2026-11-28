@@ -6,17 +6,18 @@
   <meta name="description" content="네일 사진 한 장으로 이달의 아트 게시물을 만들어 보세요.">
   <title>원컷 네일 | 사진 1장이면 끝</title>
   <link rel="stylesheet" href="./styles.css">
-  <script src="./app.js" type="module"></script>
+  <link rel="stylesheet" href="./landing.css">
+  <script src="./app.js?v=login-error-preview" type="module"></script>
 </head>
-<body>
+<body class="landing-page">
   <div class="first-screen">
     <header class="site-header">
-      <a class="brand" href="./" aria-label="원컷 네일 홈">
-        <span class="brand-mark" aria-hidden="true">✳</span> 원컷 네일
-      </a>
-      <nav aria-label="계정">
+      <a class="brand brand-wordmark" href="./" aria-label="원컷 네일 홈">onecut</a>
+      <button class="landing-menu-toggle" type="button" aria-expanded="false" aria-controls="landing-account" aria-label="계정 메뉴">
+        <span aria-hidden="true"></span>
+      </button>
+      <nav id="landing-account" aria-label="계정">
         <button class="button button-plain" type="button" data-guest data-auth="로그인">로그인</button>
-        <button class="button button-outline" type="button" data-guest data-auth="회원가입">회원가입</button>
         <a class="button button-outline" href="./mypage.html" data-account hidden>마이페이지</a>
         <button class="button button-plain" type="button" data-account data-logout hidden>로그아웃</button>
         <p class="auth-status" data-logout-status role="status"></p>
@@ -25,21 +26,34 @@
 
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
-        <h1 id="hero-title">사진 1장이면 <span>끝</span></h1>
-        <p>네일 사진 한 장으로 이달의 아트 게시물을 만들고<br class="desktop-break">
-          인스타그램에 올리세요.</p>
-        <a class="button button-primary" href="./create.html" data-auth-create>
+        <h1 id="hero-title">사진 <span class="brand-title-accent">1장</span>이면 끝</h1>
+        <p>네일 사진 한 장으로 이달의 아트 게시물을 만들고 인스타그램에 올리세요.</p>
+        <a class="button button-primary button-brand" href="./create.html" data-auth-create>
           광고 만들기 <span aria-hidden="true">↗</span>
         </a>
 
         <figure class="demo">
-          <figcaption><span aria-hidden="true"></span> 원컷 네일 실사용 영상</figcaption>
-          <!-- 촬영본을 연결할 때 .demo-placeholder를 video 요소로 교체합니다. -->
-          <div class="demo-placeholder">
-            <span class="play-mark" aria-hidden="true">▶</span>
-            <strong>실사용 영상 준비 중</strong>
-            <span>사진 첨부 · 결과 생성 · 인스타그램 게시</span>
-          </div>
+          <figcaption>원컷 네일 작업 미리보기 <span>추후 영상으로 대체</span></figcaption>
+          <!-- 촬영본이 준비되면 작업 예시를 video 요소로 교체합니다. -->
+          <ol class="landing-workflow">
+            <li>
+              <h2>사진 첨부</h2>
+              <div class="nail-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+              <p>모든 디자인 39,000원</p>
+            </li>
+            <li>
+              <h2>이미지 생성</h2>
+              <div class="workflow-art">
+                <div class="demo-price"><span>이달의 아트</span><strong>39,000원</strong></div>
+                <div class="nail-swatch result-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+            </li>
+            <li class="workflow-publish">
+              <h2>게시 미리보기</h2>
+              <div class="nail-swatch publish-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+              <p>이달의 네일 아트를 소개합니다.<br>#이달의아트 #네일아트</p>
+            </li>
+          </ol>
         </figure>
       </section>
     </main>
