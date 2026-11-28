@@ -203,18 +203,12 @@ body:has(.auth-dialog[open]) { overflow: hidden; }
 
 .auth-close:hover { background: #eee8f6; }
 .auth-action { width: 100%; }
-.auth-alternative { display: grid; gap: 14px; margin: 16px 0 6px; }
-.auth-alternative[hidden] { display: none; }
-.auth-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .8rem; }
-.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
-.auth-dialog .auth-google { width: 100%; color: #211c27; font-weight: 750; }
-.auth-dialog .auth-google:disabled { opacity: 1; }
 
 /* 인증 입력 필드와 상태 안내 문구를 정렬합니다. */
 .auth-email { display: grid; gap: 9px; }
 .auth-email label { font-size: .88rem; font-weight: 700; }
 .auth-email label:is([for="auth-email"], [for="auth-password"]) { color: var(--muted); font-weight: 500; }
-.auth-email input, .auth-dialog .auth-google { border: 1px solid var(--line); border-radius: 9px; }
+.auth-email input { border: 1px solid var(--line); border-radius: 9px; }
 .auth-email input {
   width: 100%;
   min-width: 0;
